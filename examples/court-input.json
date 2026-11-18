@@ -1,0 +1,24 @@
+{
+  "risk_id": "demo-eco-bottle",
+  "review_id": "demo-review-1",
+  "asset_version_id": "demo-copy-1",
+  "original_text": "100% Eco-Friendly. Meet the Everyday Bottle.",
+  "claim_quote": "100% Eco-Friendly",
+  "market": "GB",
+  "assessment": "requires_substantiation",
+  "reason": "泛化环保文案可能与整只水杯关联。本次审核没有收到与宣称范围匹配的企业证明。",
+  "rule_pack_version": "gb-cma-demo-1",
+  "citations": [
+    {
+      "source_id": "G1",
+      "excerpt": "Broader, more general or absolute claims are much more likely to be inaccurate and to mislead.",
+      "url": "https://www.gov.uk/government/publications/green-claims-code-making-environmental-claims/environmental-claims-on-goods-and-services#claims-must-be-truthful-and-accurate"
+    },
+    {
+      "source_id": "G2",
+      "excerpt": "Claims must be substantiated",
+      "url": "https://www.gov.uk/government/publications/green-claims-code-making-environmental-claims/environmental-claims-on-goods-and-services#claims-must-be-substantiated"
+    }
+  ],
+  "product_evidence_status": "not_supplied"
+}

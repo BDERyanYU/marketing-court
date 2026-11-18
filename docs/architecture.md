@@ -2,6 +2,8 @@
 
 首版采用 React 前端、FastAPI 后端和 SQLite。主审核由固定流程控制；模拟法庭独立管理控辩和证据台账；消费者模拟按需运行。具体业务规则见[产品说明](../AI%20Marketing%20Court%20V1.0.md)。
 
+当前可运行的庭审与消费者模拟分别位于 `backend/app/court` 和 `backend/app/jury`。产品入口在 `backend/app/main.py`，两个模块共用 `backend/app/core/model_api.py`。
+
 ```mermaid
 flowchart TB
     UI[前端：上传 / 审核视图 / 模拟庭审 / 消费者陪审团] --> API[FastAPI：认证、项目与状态 API]

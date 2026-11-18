@@ -1,0 +1,366 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AI Marketing Court · 营销文案模拟</title>
+  <style>
+    :root { color-scheme: light; font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif; color: #192a26; background: #f4f6f1; }
+    * { box-sizing: border-box; }
+    body { margin: 0; line-height: 1.6; }
+    main { max-width: 1000px; margin: 0 auto; padding: 36px 20px 64px; }
+    h1, h2, h3, p { margin: 0 0 10px; }
+    h1 { font-size: clamp(26px, 5vw, 42px); letter-spacing: -.04em; }
+    h2 { font-size: 20px; }
+    h3 { font-size: 16px; }
+    header { margin-bottom: 24px; }
+    section { background: white; padding: 22px; border: 1px solid #dfe5dc; border-radius: 14px; margin-bottom: 16px; }
+    label { display: block; font-weight: 600; margin-bottom: 5px; }
+    input, select, textarea, button { font: inherit; }
+    input, select, textarea { width: 100%; padding: 8px; border: 1px solid #b9c7bb; border-radius: 6px; background: white; color: inherit; }
+    input[type=number] { width: 100px; }
+    textarea { resize: vertical; min-height: 88px; }
+    button { background: #205948; color: white; border: 1px solid transparent; border-radius: 6px; padding: 8px 15px; cursor: pointer; }
+    button.secondary { background: white; border-color: #b9c7bb; color: #205948; }
+    button:disabled { opacity: .5; cursor: default; }
+    button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible, a:focus-visible { outline: 2px solid #2c755f; outline-offset: 2px; }
+    a { color: #205948; }
+    .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
+    .muted, small { color: #4e6359; }
+    .error { color: #982c24; }
+    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+    .item { padding: 12px; border: 1px solid #dfe5dc; border-radius: 8px; overflow-wrap: anywhere; }
+    .spaced { margin-top: 12px; }
+    ul { margin: 0; padding-left: 20px; }
+    table { border-collapse: collapse; width: 100%; margin: 8px 0 16px; }
+    th, td { text-align: left; padding: 6px; border-bottom: 1px solid #dfe5dc; }
+    details { margin-top: 10px; }
+    summary { cursor: pointer; font-weight: 600; margin-bottom: 6px; }
+    @media (max-width: 600px) { section { padding: 16px; } .grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>营销文案模拟</h1>
+    <p>确认目标画像，观察同一批模拟成员对修改前后的反应。</p>
+    <p id="mode" class="muted"></p>
+  </header>
+  <section>
+    <h2>调研报告</h2>
+    <form id="upload">
+      <label for="file">报告文件</label>
+      <input id="file" type="file" accept=".txt,.md,.pdf,.docx" required>
+      <div class="actions">
+        <button id="upload-button">上传并提取画像</button>
+        <button id="example" class="secondary" type="button">用水杯样例</button>
+      </div>
+    </form>
+    <p id="report-name" class="muted spaced"></p>
+    <form id="confirm" hidden>
+      <label for="persona">确认目标画像</label>
+      <select id="persona"></select>
+      <div id="traits" class="spaced"></div>
+      <div id="manual-wrap" class="spaced" hidden>
+        <label for="manual">填写画像</label>
+        <textarea id="manual" maxlength="1000" placeholder="描述客群购买目标、关注因素及产品使用情境"></textarea>
+      </div>
+      <div class="spaced">
+        <label for="count">模拟成员数</label>
+        <input id="count" type="number" min="2" max="5" value="3" required>
+      </div>
+      <div class="actions"><button id="derive">确认并派生成员</button></div>
+    </form>
+  </section>
+  <section>
+    <h2>配对模拟</h2>
+    <div id="panel"></div>
+    <form id="compare" class="spaced">
+      <div class="grid">
+        <div><label for="original">A · 修改前</label><textarea id="original" maxlength="4000" required></textarea></div>
+        <div><label for="revised">B · 修改后</label><textarea id="revised" maxlength="4000" required></textarea></div>
+      </div>
+      <div class="actions">
+        <button id="run" disabled>运行 A/B 盲测</button>
+        <button id="resume" class="secondary" type="button" hidden>继续模拟</button>
+        <a id="result-link" hidden>结果 JSON</a>
+      </div>
+    </form>
+    <p id="status" class="spaced" role="status" aria-live="polite"></p>
+  </section>
+  <section id="results" hidden></section>
+</main>
+<script>
+  const element = id => document.getElementById(id);
+  const state = { sample: null, report: null, panel: null, comparison: null, busy: false };
+  const metricLabels = { clarity: "清晰度", trust: "信任", appeal: "吸引力", purchase_interest: "购买考虑" };
+  const voteLabels = { would_consider: "愿意进一步了解", unsure: "不确定", would_pass: "略过" };
+  const traitLabels = { grounded: "报告支持", inferred: "模型推断", unknown: "未知", user_supplied: "用户填写" };
+
+  function add(parent, tag, text, className) {
+    const node = document.createElement(tag);
+    if (text != null) node.textContent = text;
+    if (className) node.className = className;
+    parent.append(node);
+    return node;
+  }
+
+  async function request(path, body) {
+    const options = body instanceof FormData ? { method: "POST", body } : body === undefined ? {} : {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body)
+    };
+    const response = await fetch("/api/jury" + path, options);
+    const data = await response.json();
+    if (!response.ok) throw new Error(typeof data.detail === "string" ? data.detail : "请核对输入并重试。");
+    return data;
+  }
+
+  function reportStatus(message, error = false) {
+    element("status").textContent = message;
+    element("status").classList.toggle("error", error);
+  }
+
+  async function action(message, task) {
+    if (state.busy) return;
+    state.busy = true;
+    updateButtons();
+    reportStatus(message);
+    try {
+      await task();
+    } catch (error) {
+      reportStatus(error.message, true);
+    } finally {
+      state.busy = false;
+      updateButtons();
+    }
+  }
+
+  function updateButtons() {
+    for (const id of ["upload-button", "example", "derive", "resume"]) element(id).disabled = state.busy;
+    element("run").disabled = state.busy || state.panel === null;
+    element("resume").hidden = !state.comparison || state.comparison.next_index == null;
+  }
+
+  function rememberRecord(kind, id) {
+    const query = new URLSearchParams({ [kind]: id });
+    history.replaceState(null, "", "?" + query);
+  }
+
+  async function upload(file) {
+    const form = new FormData();
+    form.append("file", file);
+    state.report = await request("/reports", form);
+    state.panel = null;
+    state.comparison = null;
+    rememberRecord("report", state.report.report_id);
+    renderReport();
+    renderPanel();
+    renderComparison();
+    reportStatus("报告已处理，请确认用于模拟的目标画像。");
+  }
+
+  function renderReport() {
+    const report = state.report;
+    element("report-name").textContent = report.filename;
+    element("confirm").hidden = false;
+    const selector = element("persona");
+    selector.replaceChildren();
+    for (const persona of report.personas) add(selector, "option", persona.name).value = persona.persona_id;
+    if (report.mode === "live") add(selector, "option", "手动填写画像").value = "manual";
+    renderTraits();
+  }
+
+  function renderTraits() {
+    const id = element("persona").value;
+    element("manual-wrap").hidden = id !== "manual";
+    const root = element("traits");
+    root.replaceChildren();
+    const persona = state.report.personas.find(item => item.persona_id === id);
+    if (!persona) return;
+    const list = add(root, "ul");
+    for (const trait of persona.traits) {
+      const line = add(list, "li", trait.attribute + " · " + trait.value + "（" + traitLabels[trait.status] + "）");
+      if (trait.source_quote) add(line, "small", "  原文「" + trait.source_quote + "」");
+    }
+  }
+
+  function renderPanel() {
+    const root = element("panel");
+    root.replaceChildren();
+    const panel = state.panel;
+    if (!panel) return;
+    add(root, "p", panel.base_persona.name + " · " + panel.members.length + " 位模拟成员");
+    add(root, "p", "采用 " + panel.theories.map(theory => theory.title).join("、"), "muted");
+    if (panel.tinytroupe_plan) {
+      const plan = add(root, "details");
+      add(plan, "summary", "查看 TinyTroupe 联合抽样计划");
+      const groups = add(plan, "ul");
+      for (const group of panel.tinytroupe_plan.sample_plan) {
+        const conditions = Object.entries(group.sampled_values).map(([name, value]) => name + "为" + value);
+        add(groups, "li", conditions.join("、") + " · " + group.quantity + " 个模拟席位");
+      }
+    }
+    const listing = add(root, "div", null, "grid");
+    for (const member of panel.members) {
+      const item = add(listing, "div", null, "item");
+      add(item, "h3", member.name);
+      add(item, "p", member.situation);
+      const details = add(item, "details");
+      add(details, "summary", "查看派生假设");
+      add(details, "p", member.assumptions.join("；"));
+      add(details, "p", member.persona_prompt, "muted");
+    }
+  }
+
+  async function restorePanel(panelId) {
+    state.panel = await request("/panels/" + encodeURIComponent(panelId));
+    state.report = await request("/reports/" + state.panel.report_id);
+    renderReport();
+    const base = state.panel.base_persona;
+    if (state.report.personas.some(persona => persona.persona_id === base.persona_id)) {
+      element("persona").value = base.persona_id;
+    } else {
+      element("persona").value = "manual";
+      element("manual").value = base.traits[0].value;
+    }
+    element("count").value = state.panel.members.length;
+    renderTraits();
+    renderPanel();
+  }
+
+  function table(parent, headings, rows) {
+    const result = add(parent, "table");
+    const header = add(add(result, "thead"), "tr");
+    for (const name of headings) add(header, "th", name).scope = "col";
+    const body = add(result, "tbody");
+    for (const values of rows) {
+      const row = add(body, "tr");
+      for (const value of values) add(row, "td", value);
+    }
+  }
+
+  function reaction(parent, title, value) {
+    const item = add(parent, "div", null, "item");
+    add(item, "h3", title);
+    add(item, "p", "理解 · " + value.interpretation);
+    add(item, "p", "关注 · " + value.noticed);
+    if (value.possible_misreading) add(item, "p", "可能误读 · " + value.possible_misreading);
+    add(item, "p", "信任理由 · " + value.trust_reason);
+    add(item, "p", "投票 · " + voteLabels[value.vote] + "。 " + value.vote_reason);
+    if (value.evidence_needed.length) add(item, "p", "待核实 · " + value.evidence_needed.join("、"));
+    add(item, "p", "不确定性 · " + value.uncertainty, "muted");
+    add(item, "p", Object.entries(metricLabels).map(([key, label]) => label + " " + value.scores[key] + "/5").join(" · "));
+  }
+
+  function renderComparison() {
+    const comparison = state.comparison;
+    const root = element("results");
+    root.replaceChildren();
+    element("result-link").hidden = !comparison;
+    root.hidden = !comparison || comparison.next_index != null;
+    if (!comparison) return;
+    element("result-link").href = "/api/jury/comparisons/" + comparison.comparison_id;
+    if (root.hidden) return;
+    add(root, "h2", comparison.mode === "demo" ? "演示结果" : "模拟结果");
+    add(root, "p", comparison.notice, "muted");
+    const copies = add(root, "div", null, "grid");
+    for (const [label, copy] of [
+      ["本次 A · 修改前", comparison.original_text], ["本次 B · 修改后", comparison.revised_text]
+    ]) {
+      const item = add(copies, "div", null, "item");
+      add(item, "h3", label);
+      add(item, "p", copy);
+    }
+    table(root, ["投票", "A · 修改前", "B · 修改后"], Object.entries(voteLabels).map(([key, label]) => [
+      label, comparison.vote_counts.A[key], comparison.vote_counts.B[key]
+    ]));
+    table(root, ["态度评分", "B 升高", "持平", "B 降低"], Object.entries(metricLabels).map(([key, label]) => {
+      const change = comparison.metric_changes[key];
+      return [label, change.higher, change.same, change.lower];
+    }));
+    for (const pair of comparison.pairs) {
+      const details = add(root, "details");
+      add(details, "summary", pair.member_name);
+      const row = add(details, "div", null, "grid");
+      reaction(row, "A · 修改前", pair.original);
+      reaction(row, "B · 修改后", pair.revised);
+    }
+  }
+
+  async function runRemaining() {
+    while (state.comparison.next_index != null) {
+      const comparison = state.comparison;
+      reportStatus("已保存 " + comparison.next_index + "/" + comparison.total_exposures + " 次独立反馈，正在生成下一条。");
+      state.comparison = await request("/comparisons/" + comparison.comparison_id + "/advance", {
+        expected_index: comparison.next_index
+      });
+      renderComparison();
+    }
+    reportStatus("全部反馈已保存，可以查看配对结果。");
+  }
+
+  element("upload").addEventListener("submit", event => {
+    event.preventDefault();
+    action("正在读取报告。", () => upload(element("file").files[0]));
+  });
+  element("example").addEventListener("click", () => action("正在加载水杯样例。", async () => {
+    const sample = state.sample || await request("/demo");
+    element("original").value = sample.original_text;
+    element("revised").value = sample.revised_text;
+    await upload(new File([sample.report_text], "bottle-research.txt", { type: "text/plain" }));
+  }));
+  element("persona").addEventListener("change", renderTraits);
+  element("confirm").addEventListener("submit", event => {
+    event.preventDefault();
+    action("正在选择营销理论并通过 TinyTroupe 抽样派生成员。", async () => {
+      const selected = element("persona").value;
+      const profile = selected === "manual" ? { manual_persona: element("manual").value } : { persona_id: selected };
+      state.panel = await request("/panels", {
+        report_id: state.report.report_id, ...profile, member_count: Number(element("count").value)
+      });
+      state.comparison = null;
+      rememberRecord("panel", state.panel.panel_id);
+      renderPanel();
+      renderComparison();
+      reportStatus("面板已保存，可以填写两版文案。");
+    });
+  });
+  element("compare").addEventListener("submit", event => {
+    event.preventDefault();
+    action("正在创建配对模拟。", async () => {
+      state.comparison = await request("/comparisons", {
+        panel_id: state.panel.panel_id, original_text: element("original").value, revised_text: element("revised").value
+      });
+      rememberRecord("comparison", state.comparison.comparison_id);
+      renderComparison();
+      await runRemaining();
+    });
+  });
+  element("resume").addEventListener("click", () => action("正在恢复模拟。", async () => {
+    state.comparison = await request("/comparisons/" + state.comparison.comparison_id);
+    renderComparison();
+    await runRemaining();
+  }));
+  action("正在读取运行模式。", async () => {
+    state.sample = await request("/demo");
+    element("mode").textContent = state.sample.mode === "demo"
+      ? "演示模式 · 使用预置报告与结果"
+      : "实时模式 · 报告文字和文案由 DeepSeek 处理";
+    const query = new URLSearchParams(location.search);
+    if (query.has("comparison")) {
+      state.comparison = await request("/comparisons/" + encodeURIComponent(query.get("comparison")));
+      await restorePanel(state.comparison.panel_id);
+      element("original").value = state.comparison.original_text;
+      element("revised").value = state.comparison.revised_text;
+      renderComparison();
+    } else if (query.has("panel")) {
+      await restorePanel(query.get("panel"));
+    } else if (query.has("report")) {
+      state.report = await request("/reports/" + encodeURIComponent(query.get("report")));
+      renderReport();
+    }
+    reportStatus("");
+  });
+</script>
+</body>
+</html>

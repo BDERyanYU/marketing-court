@@ -21,10 +21,12 @@ frontend/dist/
 /data/
 /uploads/
 /storage/
+/var/
 /.pnpm-store/
 *.db
 *.sqlite
 *.sqlite3
+*.sqlite3-*
 
 # Editor and OS files
 .DS_Store

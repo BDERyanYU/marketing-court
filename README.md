@@ -1,39 +1,34 @@
 # AI Marketing Court
 
-AI Marketing Court 是面向跨市场营销素材的证据驱动审核原型。系统计划支持广告素材解析与定位、结构化风险审核、单项改写与复核、模拟法庭，以及基于企业 Buyer Persona 的可选消费者模拟。
+AI Marketing Court 是面向跨市场营销素材的证据驱动审核原型。当前可以运行两轮模拟庭审，以及基于市场调研画像的消费者文案 A/B 模拟。广告素材解析、结构化审核和单项改写的整体范围见 [产品说明](AI%20Marketing%20Court%20V1.0.md)。
 
-本仓库目前是**项目骨架**，尚未实现审核、模型调用、法律规则库或消费者模拟。产品范围和验收标准见 [产品说明](AI%20Marketing%20Court%20V1.0.md)，模块边界见 [架构说明](docs/architecture.md)。
+## 运行水杯样例
 
-## 仓库结构
+在仓库根目录用 [uv](https://docs.astral.sh/uv/) 和已安装的 Python 3.12 启动。
 
-- `backend/app/api`：FastAPI 路由与请求模型
-- `backend/app/core`、`backend/app/models`：配置、模型适配器与共享数据契约
-- `backend/app/workflows`、`backend/app/services`：固定审核流程与素材处理服务
-- `backend/app/court`：模拟法庭调度、角色与证据台账
-- `backend/app/jury`：Persona、情境与模拟结果
-- `backend/app/data/policies`：有出处和版本的规则卡
-- `frontend/src/pages`、`frontend/src/components`：各页面及界面组件
-- `tests/fixtures`：人工核验案例与来源
-- `docs`：架构和演示资料
-
-## 本地启动骨架
-
-需要 Python 3.11+、[uv](https://docs.astral.sh/uv/)、Node.js 20+ 和 pnpm。
-
-```bash
-uv sync
-uv run uvicorn backend.app.main:app --reload
+```sh
+uv sync --locked --python 3.12 --no-python-downloads
+.venv/bin/python -m marketing_court
 ```
 
-另开终端：
+打开 [项目首页](http://127.0.0.1:8000/)。庭审接口在 [/docs](http://127.0.0.1:8000/docs)。到 [/jury](http://127.0.0.1:8000/jury) 点「用水杯样例」，确认画像并比较两版文案。默认使用固定演示数据，逐次保存评价。按 Ctrl+C 停止服务。
 
-```bash
-cd frontend
-pnpm install
-pnpm dev
+要使用真实模型，把密钥文本文件路径传给同一个启动命令。
+
+```sh
+MARKETING_COURT_MODE=live DEEPSEEK_API_KEY_FILE="/absolute/path/to/deepseek-key.txt" \
+  .venv/bin/python -m marketing_court
 ```
 
-后端的 `/health` 只用于检查服务是否启动。前端是页面导航骨架；业务功能会按产品说明逐步开发。
+共享设置见 [.env.example](.env.example)。测试命令为 `.venv/bin/python -m pytest -q`。
+
+## 组件
+
+- `backend/app/main.py` 加载庭审和消费者模拟路由。
+- `backend/app/core/model_api.py` 统一接入 DeepSeek，并校验结构化输出。
+- `backend/app/court` 按回合保存案件、发言和判决建议。详见 [庭审接口](docs/court.md)。
+- `backend/app/jury` 提取报告画像，复用 TinyTroupe 派生成员，并分别评价两版广告。详见 [消费者模拟](docs/consumer-jury.md)。
+- `frontend` 提供 React 导航骨架。模块规划见 [架构说明](docs/architecture.md)。
 
 ## 开发约定
 
