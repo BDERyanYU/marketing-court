@@ -1,0 +1,33 @@
+# Local configuration and credentials
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.venv/
+.uv-cache/
+*.egg-info/
+
+# Frontend
+node_modules/
+frontend/dist/
+*.tsbuildinfo
+
+# Local runtime data and uploaded business materials
+/data/
+/uploads/
+/storage/
+/.pnpm-store/
+*.db
+*.sqlite
+*.sqlite3
+
+# Editor and OS files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
