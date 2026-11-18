@@ -11,7 +11,7 @@ uv sync --locked --python 3.12 --no-python-downloads
 .venv/bin/python -m marketing_court
 ```
 
-打开 [项目首页](http://127.0.0.1:8000/)。庭审接口在 [/docs](http://127.0.0.1:8000/docs)。到 [/jury](http://127.0.0.1:8000/jury) 点「用水杯样例」，确认画像并比较两版文案。默认使用固定演示数据，逐次保存评价。按 Ctrl+C 停止服务。
+打开 [项目首页](http://127.0.0.1:8000/)。庭审接口在 [/docs](http://127.0.0.1:8000/docs)。到 [/jury](http://127.0.0.1:8000/jury) 点「用水杯样例」，确认画像并比较两版文案。默认使用固定演示数据，同时评价最多两位成员，每条反馈生成后立即保存。按 Ctrl+C 停止服务。
 
 要使用真实模型，把密钥文本文件路径传给同一个启动命令。
 
@@ -20,7 +20,7 @@ MARKETING_COURT_MODE=live DEEPSEEK_API_KEY_FILE="/absolute/path/to/deepseek-key.
   .venv/bin/python -m marketing_court
 ```
 
-共享设置见 [.env.example](.env.example)。测试命令为 `.venv/bin/python -m pytest -q`。
+消费者 A/B 并发上限可通过 `JURY_MAX_CONCURRENT_MEMBERS` 设置。共享设置见 [.env.example](.env.example)。测试命令为 `.venv/bin/python -m pytest -q`。
 
 ## 组件
 

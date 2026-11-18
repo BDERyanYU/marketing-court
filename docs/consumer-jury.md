@@ -41,10 +41,13 @@ MARKETING_COURT_MODE=live DEEPSEEK_API_KEY_FILE="/absolute/path/to/deepseek-key.
 | `POST /api/jury/panels` | 传 `report_id` 和 `persona_id`，或传 `manual_persona`，返回固定面板、抽样计划和理论版本 |
 | `GET /api/jury/panels/{panel_id}` | 读取抽样计划、固定成员和人物假设 |
 | `POST /api/jury/comparisons` | 传 `panel_id`、`original_text`、`revised_text`，创建比较 |
+| `POST /api/jury/comparisons/{id}/advance-members` | 传 `expected_index`，并行评价下一批成员 |
 | `POST /api/jury/comparisons/{id}/advance` | 传 `expected_index`，执行一次独立评价 |
 | `GET /api/jury/comparisons/{id}` | 读取已保存反馈，完成后包含配对结果与汇总 |
 
-报告提取用一次模型请求。默认派生 N 位成员需 N + 3 次请求，包括选择理论、生成抽样维度、制定联合配额和逐人生成规格。比较按成员逐步推进，N 位成员共 2N 次评价。每次评价用单一事务保存。页面按 `next_index` 继续，重复提交已保存步骤会返回当前记录。一次评价失败后可继续该步。单工作进程串行推进同一个比较。
+报告提取用一次模型请求。默认派生 N 位成员需 N + 3 次请求，包括选择理论、生成抽样维度、制定联合配额和逐人生成规格。A/B 要做 2N 次评价。页面每批并行处理最多 `JURY_MAX_CONCURRENT_MEMBERS` 位成员，默认 2。同一成员按既定顺序逐版评价，每次用相同的人设和一次独立的模型请求。真实模式共用项目配置的 Key。上限适用于一个服务进程内所有消费者评价。
+
+每条结果按成员 ID 和文案版本在 SQLite 事务中保存。并行结果可能乱序返回，`exposures` 的长度表示已保存条数，`next_index` 指向尚未完成的最早评价。某条失败后，已保存的结果可直接恢复，继续时只提交缺失的评价。
 
 ## TinyTroupe 派生
 

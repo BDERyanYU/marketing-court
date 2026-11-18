@@ -18,16 +18,29 @@ REACT = (
 def next_exposure(
     provider: ModelProvider, panel: Panel, comparison: Comparison, index: int,
 ) -> Exposure:
-    member_index, position = divmod(index, 2)
-    member = panel.members[member_index]
-    # Pair order is balanced while the model sees the same prompt and exactly one copy.
-    variant: Variant = "A" if (member_index + position) % 2 == 0 else "B"
+    member, variant = exposure_at(panel, index)
     copy = comparison.original_text if variant == "A" else comparison.revised_text
     return Exposure(
         member_id=member.member_id,
         variant=variant,
         reaction=react(provider, panel.base_persona, member, copy),
     )
+
+
+def exposure_at(panel: Panel, index: int) -> tuple[Member, Variant]:
+    member_index, position = divmod(index, 2)
+    variant: Variant = "A" if (member_index + position) % 2 == 0 else "B"
+    return panel.members[member_index], variant
+
+
+def pending_exposures(panel: Panel, comparison: Comparison) -> list[int]:
+    saved = {(exposure.member_id, exposure.variant) for exposure in comparison.exposures}
+    pending = []
+    for index in range(2 * len(panel.members)):
+        member, variant = exposure_at(panel, index)
+        if (member.member_id, variant) not in saved:
+            pending.append(index)
+    return pending
 
 
 def react(provider: ModelProvider, persona: Persona, member: Member, copy: str) -> Reaction:

@@ -1,13 +1,14 @@
 """Qualitative aggregation and A/B comparison boundary."""
 
 from .models import Comparison, ComparisonView, MetricChange, Pair, Panel, Scores, Variant, Vote
+from .simulation import pending_exposures
 
 
 def comparison_view(comparison: Comparison, panel: Panel) -> ComparisonView:
     total = 2 * len(panel.members)
-    count = len(comparison.exposures)
-    if count < total:
-        return ComparisonView(**comparison.model_dump(), next_index=count, total_exposures=total)
+    pending = pending_exposures(panel, comparison)
+    if pending:
+        return ComparisonView(**comparison.model_dump(), next_index=pending[0], total_exposures=total)
 
     by_member = {(result.member_id, result.variant): result.reaction for result in comparison.exposures}
     pairs = [

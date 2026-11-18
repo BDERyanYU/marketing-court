@@ -8,6 +8,7 @@ from backend.app.core.model_api import DeepSeekProvider
 
 def test_court_and_jury_run_on_the_same_application(tmp_path, monkeypatch):
     monkeypatch.setenv("MARKETING_COURT_MODE", "demo")
+    monkeypatch.setenv("JURY_MAX_CONCURRENT_MEMBERS", "1")
     app = create_app(
         court_database_path=tmp_path / "court.db",
         jury_database_path=tmp_path / "jury.db",
@@ -20,6 +21,7 @@ def test_court_and_jury_run_on_the_same_application(tmp_path, monkeypatch):
         paths = client.get("/openapi.json").raise_for_status().json()["paths"]
         assert "/api/risks/{risk_id}/appeals" in paths
         assert "/api/jury/comparisons" in paths
+        assert "/api/jury/comparisons/{comparison_id}/advance-members" in paths
 
         case = client.post("/api/risks/demo-eco-bottle/appeals").raise_for_status().json()
         case_path = f"/api/cases/{case['case_id']}"
@@ -43,10 +45,11 @@ def test_court_and_jury_run_on_the_same_application(tmp_path, monkeypatch):
             "revised_text": sample["revised_text"],
         }).raise_for_status().json()
         comparison_path = f"/api/jury/comparisons/{comparison['comparison_id']}"
-        for index in range(6):
-            comparison = client.post(comparison_path + "/advance", json={
+        for index in range(0, 6, 2):
+            comparison = client.post(comparison_path + "/advance-members", json={
                 "expected_index": index,
             }).raise_for_status().json()
+            assert len(comparison["exposures"]) == index + 2
         assert comparison["next_index"] is None and len(comparison["pairs"]) == 3
 
 

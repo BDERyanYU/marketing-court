@@ -6,7 +6,7 @@ from uuid import UUID
 
 from pydantic import BaseModel
 
-from .models import Comparison
+from .models import Comparison, Exposure
 
 
 Record = TypeVar("Record", bound=BaseModel)
@@ -46,14 +46,25 @@ class JuryRepository:
             ).fetchone()
         return model.model_validate_json(row[0]) if row is not None else None
 
-    def advance(self, comparison: Comparison, expected_index: int) -> bool:
+    def append_exposure(self, comparison_id: UUID, exposure: Exposure) -> None:
         with closing(self.connect()) as db, db:
-            updated = db.execute(
+            db.execute("BEGIN IMMEDIATE")
+            row = db.execute(
+                "SELECT body FROM jury_records WHERE kind = 'comparison' AND id = ?",
+                (str(comparison_id),),
+            ).fetchone()
+            if row is None:
+                raise LookupError("Comparison record disappeared.")
+            comparison = Comparison.model_validate_json(row[0])
+            key = (exposure.member_id, exposure.variant)
+            if any((item.member_id, item.variant) == key for item in comparison.exposures):
+                return
+            comparison.exposures.append(exposure)
+            db.execute(
                 """
                 UPDATE jury_records
                 SET body = ?, revision = revision + 1
-                WHERE kind = 'comparison' AND id = ? AND revision = ?
+                WHERE kind = 'comparison' AND id = ?
                 """,
-                (comparison.model_dump_json(), str(comparison.comparison_id), expected_index),
+                (comparison.model_dump_json(), str(comparison_id)),
             )
-        return updated.rowcount == 1

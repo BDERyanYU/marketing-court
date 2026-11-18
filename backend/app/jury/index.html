@@ -290,10 +290,15 @@
   async function runRemaining() {
     while (state.comparison.next_index != null) {
       const comparison = state.comparison;
-      reportStatus("已保存 " + comparison.next_index + "/" + comparison.total_exposures + " 次独立反馈，正在生成下一条。");
-      state.comparison = await request("/comparisons/" + comparison.comparison_id + "/advance", {
-        expected_index: comparison.next_index
-      });
+      const path = "/comparisons/" + comparison.comparison_id;
+      reportStatus("已保存 " + comparison.exposures.length + "/" + comparison.total_exposures + " 次独立反馈，正在评价下一批成员。");
+      try {
+        state.comparison = await request(path + "/advance-members", {expected_index: comparison.next_index});
+      } catch (error) {
+        state.comparison = await request(path);
+        renderComparison();
+        throw error;
+      }
       renderComparison();
     }
     reportStatus("全部反馈已保存，可以查看配对结果。");
