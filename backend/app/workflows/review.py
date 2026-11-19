@@ -88,6 +88,7 @@ class ReviewWorkflow:
             rule_pack_version=RULE_VERSION, created_at=now(), limitations=[
                 "仅覆盖英国普通消费品环保文字宣称；不覆盖视觉暗示、其他风险类别或平台专项政策。",
                 "产品证明未提供；没有识别到本主题风险不代表素材已获准投放。",
+                "规则包为有限监管指引摘录；未覆盖英国全部现行广告法律要求。",
                 *( ["改写为文案版本，原始图片未被修改；定位沿用原图，仅作参考。"] if asset.kind == "copy" else []),
                 *( ["含超出当前环保规则范围的宣称，需人工审核。"] if any(c.claim_type == "other" for c in claims) else []),
                 *( ["固定案例演示，文字与坐标来自人工预设，不代表实时 OCR 或模型输出。"] if self.provider.mode == "demo" else []),

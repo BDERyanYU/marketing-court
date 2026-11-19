@@ -23,6 +23,7 @@ class PaddleOCRService:
             try:
                 if self._engine is None:
                     os.environ.setdefault("PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK", "True")
+                    os.environ.setdefault("PADDLE_PDX_CACHE_HOME", str(Path(__file__).resolve().parents[3] / "data" / "paddle-cache"))
                     from paddleocr import PaddleOCR
                     self._engine = PaddleOCR(lang="en", use_doc_orientation_classify=False,
                                              use_doc_unwarping=False, use_textline_orientation=False,

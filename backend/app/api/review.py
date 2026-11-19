@@ -6,7 +6,6 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException, UploadFile
 from fastapi.responses import FileResponse, JSONResponse
 
 from ..core.store import new_id, now
-from ..court.demo import DEMO_INPUT
 from ..models.court import CourtInput, PolicyCitation
 from ..models.review import AssetVersion, Project, ProjectRequest, Review, Rewrite, Task
 from ..services.demo import install_demo
@@ -59,7 +58,8 @@ def build_review_router(store, workflow, courts, storage: Path):
         store.get("project", project_id, Project)
         return store.list("review", Review, project_id)
 
-    @router.post("/assets/{asset_id}/reviews", response_model=Task, status_code=202)
+    @router.post("/assets/{asset_id}/reviews", response_model=Task, status_code=202,
+                 response_model_exclude={"checkpoints"})
     def start_review(asset_id: str, background: BackgroundTasks):
         item = store.get("asset", asset_id, AssetVersion)
         if item.kind != "image":
@@ -109,7 +109,7 @@ def build_review_router(store, workflow, courts, storage: Path):
 
     @router.post("/demo", response_model=Review)
     def demo():
-        return install_demo(store, storage, workflow.provider.mode)
+        return install_demo(store, storage)
 
     @router.get("/reviews/{review_id}/report")
     def report(review_id: str):

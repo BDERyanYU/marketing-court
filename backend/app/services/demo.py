@@ -3,14 +3,14 @@
 import shutil
 from pathlib import Path
 
-from ..core.store import new_id, now
+from ..core.store import now
 from ..court.demo import DEMO_INPUT
 from ..models.review import AssetVersion, Claim, Project, Review, RiskItem, TextAnchor
 from .parsing import inspect_image
 from .retrieval import RULE_VERSION, retrieve
 
 
-def install_demo(store, storage: Path, mode: str):
+def install_demo(store, storage: Path):
     existing = store.list("review", Review, "demo-project")
     if existing:
         return next(r for r in existing if r.review_id == DEMO_INPUT.review_id)

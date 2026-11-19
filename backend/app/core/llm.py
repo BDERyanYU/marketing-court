@@ -73,7 +73,7 @@ class DeepSeekProvider:
             "messages": messages,
             "response_format": {"type": "json_object"},
             "thinking": {"type": "disabled"},
-            "max_tokens": 800,
+            "max_tokens": 2400 if step in ("claim_extraction", "risk_assessment") else 800,
             "temperature": 0.3,
         }
         try:

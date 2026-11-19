@@ -1,9 +1,10 @@
 /* Uses the installed browser and Playwright package supplied through environment. */
-const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright')
+const { chromium } = require(process.env.PLAYWRIGHT_MODULE || '../frontend/node_modules/@playwright/test')
 const fs = require('node:fs')
 const path = require('node:path')
 
 async function main() {
+  process.chdir(path.resolve(__dirname, '..'))
   fs.mkdirSync('test-results', { recursive: true })
   const browser = await chromium.launch({ executablePath: process.env.BROWSER_PATH || 'C:/Program Files/Google/Chrome/Application/chrome.exe', headless: true })
   const page = await browser.newPage({ viewport: { width: 1440, height: 1100 } })
@@ -22,6 +23,8 @@ async function main() {
     const rewrite = page.getByRole('button', { name: '谨慎改写与复核' })
     if (await rewrite.count()) await rewrite.click()
     await page.getByRole('heading', { name: '文案改写与复核', exact: true }).waitFor()
+    const freshCase = await page.request.post('http://127.0.0.1:5173/api/risks/demo-eco-bottle/appeals')
+    if (!freshCase.ok()) throw new Error('Could not create a fresh rehearsal case')
     await page.getByRole('button', { name: '提出异议' }).click()
     await page.getByRole('heading', { name: '观点可以交锋，证据必须可查。' }).waitFor()
     const advance = page.getByRole('button', { name: '推进下一步' })

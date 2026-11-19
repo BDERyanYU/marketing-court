@@ -1,6 +1,5 @@
 """Small SQLite JSON repository with atomic task and result writes."""
 
-import json
 import sqlite3
 from contextlib import contextmanager
 from datetime import UTC, datetime
@@ -119,4 +118,5 @@ class Store:
             for kind, identifier, parent, value in records:
                 self.write(db, kind, identifier, parent, value)
             task.status, task.stage, task.error = "completed", "completed", None
+            task.events.append("completed")
             db.execute("UPDATE review_tasks SET payload=? WHERE id=?", (task.model_dump_json(), task.task_id))
