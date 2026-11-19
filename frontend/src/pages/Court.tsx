@@ -1,5 +1,6 @@
 import type { CourtCase } from '../lib/types'
 import Icon from '../components/Icon'
+import { marketName } from '../lib/project-options'
 
 const dispositions: Record<string, string> = {
   upheld: '维持风险意见',
@@ -76,9 +77,7 @@ export default function Court({
           </span>
           <h2>争议宣称</h2>
           <blockquote>{court.snapshot.claim_quote}</blockquote>
-          <p className="muted">
-            {court.snapshot.market === 'EU' ? '欧盟' : '英国'} · 产品证明未提供
-          </p>
+          <p className="muted">{marketName(court.snapshot.market)} · 产品证明未提供</p>
           <h3>冻结的规则与依据</h3>
           {court.snapshot.citations.map((s) => (
             <div className="source" key={s.source_id}>

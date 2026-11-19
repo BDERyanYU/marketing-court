@@ -84,7 +84,7 @@ def test_each_negative_risk_supports_court_and_conservative_rewrite(tmp_path, ca
         assert client.get(f'/api/cases/{case["case_id"]}').json() == finished
 
 
-def test_examples_do_not_expand_live_upload_scope_or_call_models(tmp_path):
+def test_examples_do_not_call_live_models(tmp_path):
     provider = Provider()
     with TestClient(create_app(database_path=tmp_path / "cases.db", provider=provider)) as client:
         review = client.post('/api/demo-cases/apple-watch').json()
@@ -92,6 +92,6 @@ def test_examples_do_not_expand_live_upload_scope_or_call_models(tmp_path):
         result = client.post(f'/api/reviews/{review["review_id"]}/risks/{risk["risk_id"]}/rewrite').json()
         assert client.get(f'/api/tasks/{result["task_id"]}').json()["status"] == "completed"
         assert provider.calls == []
-        assert client.post('/api/projects', json={"name": "Unsupported EU", "market": "EU"}).status_code == 422
+        assert client.post('/api/projects', json={"name": "EU project", "market": "EU"}).status_code == 201
         assert client.post('/api/demo-cases/missing').status_code == 404
         assert client.post('/api/demo').json()["review_id"] == "demo-review-1"

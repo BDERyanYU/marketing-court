@@ -1,3 +1,5 @@
+import type { Market, ProductCategory } from './project-options'
+
 export type Page = 'setup' | 'review' | 'court'
 export interface Health {
   status: string
@@ -11,8 +13,8 @@ export interface Project {
 }
 export interface ProjectInput {
   name: string
-  market: 'GB'
-  product_category: 'reusable_bottle'
+  market: Market
+  product_category: ProductCategory
 }
 export interface Asset {
   asset_version_id: string
@@ -41,6 +43,7 @@ export interface Source {
   version: string
 }
 export interface Risk {
+  input_origin?: 'image' | 'text' | 'both'
   risk_id: string
   claim_quote: string
   severity: 'high' | 'medium' | 'low'
@@ -63,6 +66,12 @@ export interface DemoCase {
   provenance: string
 }
 export interface Review {
+  claims?: { claim_id: string; claim_text: string; claim_type: string }[]
+  image_text?: string
+  supplied_text?: string
+  market?: Market
+  product_category?: ProductCategory
+  coverage_status?: 'limited' | 'unsupported'
   review_id: string
   asset_version_id: string
   project_id: string

@@ -47,10 +47,19 @@ class ReviewWorkflow:
                     step="claim_extraction",
                     instruction=("提取广告中的可审核宣称。claim_text 必须逐字复制 original_text 的连续片段，不得改写。"
                                  "环保相关标 environmental，其余为 other；不要为普通产品名称制造宣称。"),
-                    context={"original_text": text, "market": project.market}, output=ClaimExtraction)
+                    context={"original_text": text, "market": project.market,
+                             "product_category": project.product_category}, output=ClaimExtraction)
             if any(c.claim_text not in text for c in extraction.claims):
                 raise ModelError("模型宣称未逐字对应原文，未保存审核结论，请重试。")
             claims = [map_claim(c, anchors) for c in extraction.claims]
+            if not prefix:
+                for claim in claims:
+                    in_text = claim.claim_text in (asset.text or "")
+                    in_image = claim.claim_text in "\n".join(a.text for a in anchors)
+                    claim.input_origin = "both" if in_text and in_image else "text" if in_text else "image"
+                    if claim.input_origin == "text":
+                        claim.anchor_ids = []
+                        claim.location_status = "needs_confirmation"
             self.checkpoint(task, key("claims_extracted"), **{key("claims"): [c.model_dump() for c in claims]})
         else:
             from ..models.review import Claim
@@ -74,6 +83,7 @@ class ReviewWorkflow:
                         instruction=("依据提供的 CMA 监管指引审核该环保宣称。产品证据未提供，不得认定事实已被推翻。"
                                      "必须引用 sources 内的 source_id。仅给风险复核意见，不能批准投放或断言违法。"),
                         context={"original_text": text, "claim": claim.model_dump(), "market": project.market,
+                                 "product_category": project.product_category,
                                  "sources": [s.model_dump() for s in applicable], "product_evidence_status": "not_supplied"},
                         output=RiskAssessment)
                 allowed = {s.source_id for s in applicable}
@@ -83,14 +93,21 @@ class ReviewWorkflow:
                 self.checkpoint(task, key("risk_validated"), **{assessment_key: assessment})
             if assessment["assessment"] != "no_issue_identified":
                 risks.append(RiskItem(**assessment, risk_id=new_id("risk"), claim_id=claim.claim_id,
+                    input_origin=claim.input_origin,
                     claim_quote=claim.claim_text, anchor_ids=claim.anchor_ids, location_status=claim.location_status))
         return Review(review_id=new_id("review"), asset_version_id=asset.asset_version_id,
+            market=project.market, product_category=project.product_category,
+            coverage_status="limited" if sources else "unsupported",
             project_id=project.project_id, mode=self.provider.mode, model=self.provider.model,
             original_text=text, anchors=anchors, claims=claims, risks=risks, sources=sources,
-            rule_pack_version=RULE_VERSION, created_at=now(), limitations=[
-                "仅覆盖英国普通消费品环保文字宣称；不覆盖视觉暗示、其他风险类别或平台专项政策。",
+            image_text="\n".join(a.text for a in anchors) if not prefix else "",
+            supplied_text=(asset.text or "") if not prefix else "",
+            rule_pack_version=RULE_VERSION if sources else "none", created_at=now(), limitations=[
+                *( ["仅覆盖英国普通消费品环保文字宣称；不覆盖视觉暗示、其他风险类别或平台专项政策。",
+                    "食品、美妆等品类的专项规定未接入，需另行审核。"] if sources else
+                   ["该市场规则尚未接入；仅完成文字识别与宣称提取，未作风险判定。"]),
                 "产品证明未提供；没有识别到本主题风险不代表素材已获准投放。",
-                "规则包为有限监管指引摘录；未覆盖英国全部现行广告法律要求。",
+                *( ["规则包为有限监管指引摘录；未覆盖英国全部现行广告法律要求。"] if sources else []),
                 *( ["改写为文案版本，原始图片未被修改；定位沿用原图，仅作参考。"] if asset.kind == "copy" else []),
                 *( ["含超出当前环保规则范围的宣称，需人工审核。"] if any(c.claim_type == "other" for c in claims) else []),
                 *( ["固定案例演示，文字与坐标来自人工预设，不代表实时 OCR 或模型输出。"] if self.provider.mode == "demo" else []),
@@ -105,15 +122,16 @@ class ReviewWorkflow:
             asset = self.store.get("asset", task.resource_id, AssetVersion)
             project = self.store.get("project", asset.project_id, Project)
             if self.provider.mode != "live":
-                raise ModelError("新上传图片需要实时模式；固定演示请使用预设案例。")
+                raise ModelError("新素材需要实时模式；固定演示请使用预设案例。")
             cached = task.checkpoints.get("anchors")
             if cached is None:
                 self.checkpoint(task, "asset_parsing")
-                anchors = self.ocr.extract(self.storage / asset.storage_name, asset.width, asset.height)
+                anchors = (self.ocr.extract(self.storage / asset.storage_name, asset.width, asset.height)
+                           if asset.kind == "image" else [])
                 self.checkpoint(task, "asset_parsed", anchors=[a.model_dump() for a in anchors])
             else:
                 anchors = [TextAnchor.model_validate(a) for a in cached]
-            text = "\n".join(a.text for a in anchors)
+            text = "\n\n".join(part for part in ("\n".join(a.text for a in anchors), asset.text) if part)
             review = self.analyze(text, anchors, asset, project, task)
             task.result_id = review.review_id
             self.store.finish(task, [("review", review.review_id, project.project_id, review)])

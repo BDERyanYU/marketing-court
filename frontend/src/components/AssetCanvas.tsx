@@ -61,7 +61,11 @@ export default function AssetCanvas({
     return (
       <div className="text-asset" ref={container}>
         <p className="text-asset-label">
-          {asset.parent_asset_version_id ? '改写文案版本' : '案例原始文案'}
+          {asset.parent_asset_version_id
+            ? '改写文案版本'
+            : review?.example
+              ? '案例原始文案'
+              : '提交的广告文案'}
         </p>
         <div className="text-asset-content" lang="en">
           {pieces}

@@ -1,8 +1,9 @@
 """Review routes. All business changes are performed on the server."""
 
+import hashlib
 from pathlib import Path
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, JSONResponse
 
 from ..core.store import new_id, now
@@ -27,8 +28,19 @@ def build_review_router(store, workflow, courts, storage: Path):
         return project
 
     @router.post("/projects/{project_id}/assets", response_model=AssetVersion, status_code=201)
-    async def upload(project_id: str, file: UploadFile):
+    async def upload(project_id: str, file: UploadFile | None = None,
+                     text: str = Form(default="", max_length=8000)):
         store.get("project", project_id, Project)
+        text = text.strip()
+        if file is None:
+            if not text:
+                raise HTTPException(422, "请添加广告图片或输入广告文案，至少提供一项。")
+            asset_id = new_id("asset")
+            asset = AssetVersion(asset_version_id=asset_id, project_id=project_id, kind="text",
+                original_filename="广告文案", sha256=hashlib.sha256(text.encode()).hexdigest(),
+                width=0, height=0, image_url="", storage_name="", text=text, created_at=now())
+            store.add("asset", asset_id, project_id, asset)
+            return asset
         content = await file.read(MAX_UPLOAD_BYTES + 1)
         await file.close()
         width, height, suffix, digest = inspect_image(content, file.content_type)
@@ -38,7 +50,8 @@ def build_review_router(store, workflow, courts, storage: Path):
         (storage / filename).write_bytes(content)
         asset = AssetVersion(asset_version_id=asset_id, project_id=project_id,
             original_filename=Path(file.filename or "upload").name[:200], sha256=digest, width=width,
-            height=height, storage_name=filename, image_url=f"/api/assets/{asset_id}/image", created_at=now())
+            height=height, storage_name=filename, image_url=f"/api/assets/{asset_id}/image",
+            text=text or None, created_at=now())
         store.add("asset", asset_id, project_id, asset)
         return asset
 
@@ -65,10 +78,10 @@ def build_review_router(store, workflow, courts, storage: Path):
                  response_model_exclude={"checkpoints"})
     def start_review(asset_id: str, background: BackgroundTasks):
         item = store.get("asset", asset_id, AssetVersion)
-        if item.kind != "image":
+        if item.kind == "copy" or item.parent_asset_version_id:
             raise HTTPException(409, "文案版本通过改写复核流程生成。")
         if workflow.provider.mode != "live":
-            raise HTTPException(409, "新上传素材需要实时模式，请先配置 DeepSeek 与 OCR；也可打开预设案例。")
+            raise HTTPException(409, "新素材需要实时模式，请先配置 DeepSeek；图片审核还需 OCR。也可打开预设案例。")
         task, fresh = store.start_task("review", asset_id, workflow.provider.mode, workflow.provider.model)
         if fresh:
             background.add_task(workflow.run, task.task_id)

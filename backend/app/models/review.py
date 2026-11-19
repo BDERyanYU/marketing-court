@@ -8,16 +8,19 @@ from pydantic import Field
 from .court import Identifier, StrictModel
 
 
+Market = Literal["GB", "EU", "US", "CA", "AU", "CN", "JP", "KR", "SG"]
+ProductCategory = Literal["reusable_bottle", "household", "electronics", "clothing", "beauty",
+                          "food", "pet_supplies", "office_supplies", "packaging", "other"]
+
+
 class ProjectRequest(StrictModel):
     name: str = Field(min_length=1, max_length=100)
-    market: Literal["GB"] = "GB"
-    product_category: Literal["reusable_bottle"] = "reusable_bottle"
+    market: Market = "GB"
+    product_category: ProductCategory = "reusable_bottle"
     channel: Literal["general_advertising"] = "general_advertising"
 
 
 class Project(ProjectRequest):
-    market: Literal["GB", "EU"] = "GB"
-    product_category: Literal["reusable_bottle", "electronics", "pet_supplies", "office_supplies"] = "reusable_bottle"
     project_id: str
     created_at: datetime
 
@@ -55,6 +58,7 @@ class ClaimExtraction(StrictModel):
 
 
 class Claim(ExtractedClaim):
+    input_origin: Literal["image", "text", "both"] = "image"
     claim_id: str
     anchor_ids: list[str]
     location_status: Literal["located", "needs_confirmation"]
@@ -87,6 +91,7 @@ class RiskAssessment(StrictModel):
 
 
 class RiskItem(RiskAssessment):
+    input_origin: Literal["image", "text", "both"] = "image"
     risk_id: str
     claim_id: str
     claim_quote: str
@@ -118,6 +123,11 @@ class DemoRule(StrictModel):
 
 
 class Review(StrictModel):
+    image_text: str = ""
+    supplied_text: str = ""
+    market: Market = "GB"
+    product_category: ProductCategory = "reusable_bottle"
+    coverage_status: Literal["limited", "unsupported"] = "limited"
     review_id: str
     asset_version_id: str
     project_id: str

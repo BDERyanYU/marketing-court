@@ -351,11 +351,14 @@ export default function App() {
                   setPage('review')
                 })
               }
-              onUpload={(project, file) =>
+              onUpload={(project, file, text, projectId) =>
                 void action('上传素材', async () => {
-                  const p = await post<Project>('/api/projects', project)
+                  const p = projectId
+                    ? { project_id: projectId }
+                    : await post<Project>('/api/projects', project)
                   const data = new FormData()
-                  data.append('file', file)
+                  if (file) data.append('file', file)
+                  if (text) data.append('text', text)
                   const a = await api<Asset>(`/api/projects/${p.project_id}/assets`, {
                     method: 'POST',
                     body: data,
@@ -363,6 +366,8 @@ export default function App() {
                   setAsset(a)
                   setReview(null)
                   setCourt(null)
+                  setTask(null)
+                  setAuto(false)
                   setRewrites([])
                   setPage('review')
                   setTask(await post<Task>(`/api/assets/${a.asset_version_id}/reviews`))

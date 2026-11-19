@@ -105,7 +105,8 @@ def evaluate(case, text, *, review_id=None, asset_id=None):
             severity="high" if high else "medium", reason=prefix + explanations,
             source_ids=["G1", "G2"] if case["market"] == "GB" else [], evidence_gaps=gaps[:5],
             anchor_ids=[], location_status="needs_confirmation", demo_rule_ids=[r["id"] for r in matched] or ["LR-000"]))
-    return Review(review_id=review_id or f'greenlint-{case["case_id"]}-review',
+    return Review(market=case["market"], product_category={"apple-watch": "electronics", "eco-dog-bed": "pet_supplies", "copier-paper": "office_supplies"}[case["case_id"]],
+        review_id=review_id or f'greenlint-{case["case_id"]}-review',
         asset_version_id=asset_id or f'greenlint-{case["case_id"]}-asset',
         project_id=f'greenlint-{case["case_id"]}-project', mode="demo", model="greenlint-fixture-v1.2",
         original_text=text, anchors=[], claims=claims, risks=risks,

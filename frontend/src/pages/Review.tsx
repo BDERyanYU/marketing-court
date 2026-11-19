@@ -1,6 +1,7 @@
 import AssetCanvas from '../components/AssetCanvas'
 import Icon from '../components/Icon'
 import { resourceUrl } from '../lib/api'
+import { marketName, categoryName } from '../lib/project-options'
 import type { Asset, Review as ReviewData, Rewrite } from '../lib/types'
 
 interface Props {
@@ -52,7 +53,9 @@ export default function Review({
           <p className="intro">
             {review?.example
               ? `${review.example.market === 'GB' ? '英国' : '欧盟'} · ${review.example.category} · ${review.example.title}`
-              : '英国 · 日用消费品 · 环保宣称'}
+              : review
+                ? `${marketName(review.market ?? 'GB')} · ${categoryName(review.product_category ?? 'reusable_bottle')} · 环保宣称`
+                : '素材已保存 · 等待检查'}
             {asset.parent_asset_version_id ? ' · 改写文案版本' : ''}
           </p>
         </div>
@@ -77,6 +80,11 @@ export default function Review({
           </span>
         </div>
       )}
+      {review?.coverage_status === 'unsupported' && (
+        <div className="notice" role="status">
+          该市场规则尚未接入。本次仅完成文字识别与宣称提取，未作风险判定。
+        </div>
+      )}
       {review && (
         <div className="review-summary">
           <span>
@@ -85,7 +93,9 @@ export default function Review({
           </span>
           <span>
             <i className="summary-dot risk-dot" />
-            {review.risks.length} 项待核查
+            {review.coverage_status === 'unsupported'
+              ? '未作风险判定'
+              : `${review.risks.length} 项待核查`}
           </span>
           <span>
             <Icon name="shield" size={16} />
@@ -111,7 +121,11 @@ export default function Review({
               </h2>
             </div>
             <span className="small-tag">
-              {asset.kind === 'text' ? '文案案例' : `${asset.width} × ${asset.height}`}
+              {asset.kind === 'text'
+                ? review?.example
+                  ? '文案案例'
+                  : '广告文案'
+                : `${asset.width} × ${asset.height}`}
             </span>
           </div>
           <AssetCanvas
@@ -120,6 +134,23 @@ export default function Review({
             selectedRisk={selectedRisk}
             onSelect={onSelect}
           />
+          {asset.kind !== 'text' &&
+            (review?.supplied_text || asset.text) &&
+            !asset.parent_asset_version_id && (
+              <section className="attached-copy">
+                <h3>同时提交的广告文案</h3>
+                <AssetCanvas
+                  asset={{ ...asset, kind: 'text', text: review?.supplied_text || asset.text }}
+                  review={
+                    review
+                      ? { ...review, original_text: review.supplied_text || asset.text || '' }
+                      : null
+                  }
+                  selectedRisk={selectedRisk}
+                  onSelect={onSelect}
+                />
+              </section>
+            )}
           <div className="asset-caption">
             <span>{asset.original_filename}</span>
             <span>{asset.kind === 'text' ? '未提供原始图片' : '点击标注查看风险'}</span>
@@ -133,7 +164,13 @@ export default function Review({
         <section className="risk-column">
           <div className="section-heading">
             <h2>审核发现</h2>
-            <span>{review ? `${review.risks.length} 项待核查` : '等待审核'}</span>
+            <span>
+              {review?.coverage_status === 'unsupported'
+                ? '未作风险判定'
+                : review
+                  ? `${review.risks.length} 项待核查`
+                  : '等待审核'}
+            </span>
           </div>
           {!review && (
             <div className="panel">
@@ -165,7 +202,7 @@ export default function Review({
                   </span>
                   <span>
                     风险 {String(index + 1).padStart(2, '0')} ·{' '}
-                    {asset.kind === 'text'
+                    {asset.kind === 'text' || risk.input_origin === 'text'
                       ? '文案片段'
                       : risk.location_status === 'located'
                         ? '已定位原文'
@@ -251,14 +288,18 @@ export default function Review({
           {review && review.risks.length === 0 && (
             <div className="panel no-risk">
               <h3>
-                {review.example?.polarity === 'positive'
-                  ? '正面对照：未发现明显风险'
-                  : '未识别到本主题待核查项'}
+                {review.coverage_status === 'unsupported'
+                  ? '等待接入该市场规则'
+                  : review.example?.polarity === 'positive'
+                    ? '正面对照：未发现明显风险'
+                    : '未识别到本主题待核查项'}
               </h3>
               <p>
-                {review.example
-                  ? `仅表示当前文案在 GreenLint 包内${review.example.market === 'EU' ? '欧盟' : '英国'}演示规则下未命中；产品属性与证明未核验，不代表已获投放批准。`
-                  : '检查仅覆盖当前环保文字规则，不表示素材已获得投放批准。'}
+                {review.coverage_status === 'unsupported'
+                  ? '素材与提取结果已保存。当前没有适用规则，因此不能判断是否存在风险。'
+                  : review.example
+                    ? `仅表示当前文案在 GreenLint 包内${review.example.market === 'EU' ? '欧盟' : '英国'}演示规则下未命中；产品属性与证明未核验，不代表已获投放批准。`
+                    : '检查仅覆盖当前环保文字规则，不表示素材已获得投放批准。'}
               </p>
               {review.example?.polarity === 'positive' && (
                 <ul className="positive-reasons">
@@ -266,6 +307,18 @@ export default function Review({
                   <li>提供 FSC 编号线索，但证书真实性和适用范围仍待核验。</li>
                   <li>“darker than conventional” 比较的是纸张颜色，没有被误判为环保性能比较。</li>
                 </ul>
+              )}
+              {review.coverage_status === 'unsupported' && (
+                <>
+                  <h4>提取的宣称</h4>
+                  {review.claims?.length ? (
+                    review.claims.map((c) => (
+                      <blockquote key={c.claim_id}>{c.claim_text}</blockquote>
+                    ))
+                  ) : (
+                    <p>未提取到可审核宣称；原始素材已保留。</p>
+                  )}
+                </>
               )}
             </div>
           )}
