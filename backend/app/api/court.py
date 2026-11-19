@@ -7,7 +7,7 @@ from ..models import AdvanceRequest, CourtCase, CourtInput, Identifier
 from ..court.repository import CourtRepository
 
 
-def build_router(repository: CourtRepository, controller: CourtController) -> APIRouter:
+def build_router(repository: CourtRepository, controller: CourtController, snapshot_loader=None) -> APIRouter:
     router = APIRouter(prefix="/api", tags=["Court"])
 
     @router.put("/court-inputs/{risk_id}", response_model=CourtInput)
@@ -19,7 +19,13 @@ def build_router(repository: CourtRepository, controller: CourtController) -> AP
 
     @router.post("/risks/{risk_id}/appeals", status_code=201, response_model=CourtCase)
     def open_appeal(risk_id: Identifier) -> CourtCase:
+        if repository.get_input(risk_id) is None and snapshot_loader is not None:
+            repository.register_input(snapshot_loader(risk_id))
         return controller.open_case(risk_id)
+
+    @router.get("/risks/{risk_id}/cases", response_model=list[CourtCase])
+    def list_cases(risk_id: Identifier):
+        return repository.list_cases(risk_id)
 
     @router.get("/cases/{case_id}", response_model=CourtCase)
     def read_case(case_id: UUID) -> CourtCase:

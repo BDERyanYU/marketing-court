@@ -129,6 +129,12 @@ class CourtRepository:
             judgment=judgment,
         )
 
+    def list_cases(self, risk_id: str | None = None) -> list[CourtCase]:
+        with closing(self._connect()) as connection:
+            rows = connection.execute("SELECT case_id FROM court_cases ORDER BY created_at DESC").fetchall()
+        cases = [self.get_case(UUID(row["case_id"])) for row in rows]
+        return [case for case in cases if case and (risk_id is None or case.snapshot.risk_id == risk_id)]
+
     def commit_step(
         self,
         case_id: UUID,

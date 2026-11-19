@@ -1,0 +1,39 @@
+{
+  "version": "gb-cma-demo-1",
+  "sources": [
+    {
+      "source_id": "G1",
+      "excerpt": "Broader, more general or absolute claims are much more likely to be inaccurate and to mislead.",
+      "url": "https://www.gov.uk/government/publications/green-claims-code-making-environmental-claims/environmental-claims-on-goods-and-services#claims-must-be-truthful-and-accurate",
+      "title": "CMA Green Claims Code",
+      "issuer": "Competition and Markets Authority",
+      "market": "GB",
+      "product_scope": "consumer_goods",
+      "platform": null,
+      "source_kind": "regulator_guidance",
+      "published_on": "2021-09-20",
+      "effective_from": null,
+      "effective_to": null,
+      "checked_at": "2026-11-19",
+      "version": "gb-cma-demo-1",
+      "content_hash": "61476c4064a664fd77668f2f64e4a40072462423db9e92aa386fcb43fe93384c"
+    },
+    {
+      "source_id": "G2",
+      "excerpt": "Claims must be substantiated",
+      "url": "https://www.gov.uk/government/publications/green-claims-code-making-environmental-claims/environmental-claims-on-goods-and-services#claims-must-be-substantiated",
+      "title": "CMA Green Claims Code",
+      "issuer": "Competition and Markets Authority",
+      "market": "GB",
+      "product_scope": "consumer_goods",
+      "platform": null,
+      "source_kind": "regulator_guidance",
+      "published_on": "2021-09-20",
+      "effective_from": null,
+      "effective_to": null,
+      "checked_at": "2026-11-19",
+      "version": "gb-cma-demo-1",
+      "content_hash": "4fc1015b3527318553812cca0f9a6f8bc3d2395d94003fbd6aa7f565f73e0145"
+    }
+  ]
+}

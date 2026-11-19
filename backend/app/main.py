@@ -1,4 +1,6 @@
 from pathlib import Path
+from contextlib import asynccontextmanager
+import os
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, RedirectResponse
@@ -9,18 +11,35 @@ from .court.controller import CourtConflict, CourtController, CourtNotFound
 from .court.demo import DEMO_INPUT
 from .core.llm import ModelError, ModelProvider
 from .court.repository import CourtRepository, InputConflict
+from .api.review import build_review_router, snapshot_for_risk
+from .core.store import Store
+from .services.ocr import PaddleOCRService
+from .workflows.review import ReviewWorkflow
 
 
-def create_app(*, database_path: Path | None = None, provider: ModelProvider | None = None) -> FastAPI:
-    repository = CourtRepository(database_path or database_path_from_env())
+def create_app(*, database_path: Path | None = None, provider: ModelProvider | None = None,
+               storage_path: Path | None = None, ocr=None) -> FastAPI:
+    path = database_path or database_path_from_env()
+    repository = CourtRepository(path)
+    store = Store(path)
+    storage = storage_path or Path(os.environ.get("STORAGE_DIR", str(path.parent / "uploads")))
     provider = provider if provider is not None else provider_from_env()
     repository.register_input(DEMO_INPUT, keep_existing=True)
     controller = CourtController(repository, provider)
+    workflow = ReviewWorkflow(store, provider, ocr if ocr is not None else PaddleOCRService(), storage)
+
+    @asynccontextmanager
+    async def lifespan(_app):
+        store.recover()
+        yield
+
     app = FastAPI(
         title="AI Marketing Court · P0",
         description="模拟庭审与风险复核建议。投放审批由人工负责。",
+        lifespan=lifespan,
     )
-    app.include_router(build_router(repository, controller))
+    app.include_router(build_router(repository, controller, lambda risk: snapshot_for_risk(store, risk)))
+    app.include_router(build_review_router(store, workflow, repository, storage))
 
     @app.get("/", include_in_schema=False)
     def docs():

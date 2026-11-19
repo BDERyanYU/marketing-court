@@ -10,7 +10,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
 def database_path_from_env() -> Path:
     default = PROJECT_ROOT / "data" / "marketing_court.sqlite3"
-    return Path(os.environ.get("COURT_DB_PATH", str(default))).expanduser()
+    return Path(os.environ.get("DATABASE_PATH", os.environ.get("COURT_DB_PATH", str(default)))).expanduser()
 
 
 def provider_from_env() -> ModelProvider:

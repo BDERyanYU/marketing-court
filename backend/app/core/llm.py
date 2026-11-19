@@ -23,7 +23,7 @@ class ModelProvider(Protocol):
     def complete(
         self,
         *,
-        step: CourtStep,
+        step: str,
         instruction: str,
         context: dict[str, Any],
         output: type[Output],
@@ -47,7 +47,7 @@ class DeepSeekProvider:
     def complete(
         self,
         *,
-        step: CourtStep,
+        step: str,
         instruction: str,
         context: dict[str, Any],
         output: type[Output],
