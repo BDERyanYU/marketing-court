@@ -54,7 +54,7 @@ async function main() {
     console.log(`${mode}: upload, refresh recovery, real review, risk report and JSON export passed.`)
   }
   try {
-    await page.goto(app)
+    await page.goto(app + '/review')
     await runMaterial('广告文案', true)
     await runMaterial('广告图片')
     await runMaterial('图片＋文案')

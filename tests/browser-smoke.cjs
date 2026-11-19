@@ -55,7 +55,7 @@ async function main() {
       throw new Error(
         "Browser smoke requires a demo backend; use API_PROXY_URL to target an isolated demo server.",
       );
-    await page.goto(`${appUrl}/`);
+    await page.goto(`${appUrl}/review`);
     if (
       await page.getByRole("button", { name: "模拟法庭", exact: true }).count()
     )
@@ -217,7 +217,7 @@ async function main() {
     );
     await uploadPage.goto(`${appUrl}/?ui=v2`);
     await uploadPage
-      .getByLabel("项目名称", { exact: true })
+      .getByRole('textbox', { name: "项目名称", exact: true })
       .fill("新版上传验证");
     await uploadPage
       .getByLabel("选择广告图片")

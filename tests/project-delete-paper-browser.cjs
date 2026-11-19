@@ -22,7 +22,7 @@ async function main() {
     const demo = await (await page.request.post(backend + '/api/demo')).json();
     const name = '删除检查项目-' + Date.now();
     const target = await (await page.request.post(backend + '/api/projects', { data: { name } })).json();
-    await page.goto(app);
+    await page.goto(app + '/review');
     const open = page.locator('.sidebar-project').filter({ hasText: name });
     const trash = page.getByRole('button', { name: '删除项目：' + name, exact: true });
     await open.click();

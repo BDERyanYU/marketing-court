@@ -22,27 +22,32 @@ function savedSession(): { page?: Page; projectId?: string; reviewId?: string; t
 export default function App() {
   const initial = useRef(savedSession())
   const [page, setPage] = useState<Page>(
-    location.pathname === '/jury'
+    location.pathname.replace(/\/$/, '') === '/jury'
       ? 'persona'
-      : ['review', 'project'].includes(initial.current.page ?? '')
-        ? initial.current.page!
-        : 'setup',
+      : location.hash === '#greenlint-cases'
+        ? 'setup'
+        : ['review', 'project'].includes(initial.current.page ?? '')
+          ? initial.current.page!
+          : 'setup',
   )
-  const [personaVisited, setPersonaVisited] = useState(location.pathname === '/jury')
+  const [personaVisited, setPersonaVisited] = useState(
+    location.pathname.replace(/\/$/, '') === '/jury',
+  )
   const [personaHealth, setPersonaHealth] = useState<Health | null>(null)
   const navigate = useCallback((next: Page) => {
     setPage(next)
     if (next === 'persona') {
       setPersonaVisited(true)
-      if (location.pathname !== '/jury') {
+      if (location.pathname.replace(/\/$/, '') !== '/jury') {
         const saved = sessionStorage.getItem('marketing-persona-record')
         window.history.pushState(null, '', saved?.startsWith('/jury?') ? saved : '/jury')
       }
-    } else if (location.pathname === '/jury') window.history.pushState(null, '', '/')
+    } else if (location.pathname.replace(/\/$/, '') === '/jury')
+      window.history.pushState(null, '', '/review')
   }, [])
   useEffect(() => {
     const sync = () => {
-      const isPersona = location.pathname === '/jury'
+      const isPersona = location.pathname.replace(/\/$/, '') === '/jury'
       if (isPersona) setPersonaVisited(true)
       setPage(isPersona ? 'persona' : 'setup')
     }
@@ -199,7 +204,7 @@ export default function App() {
         if (current.status === 'completed' && current.result_id) {
           if (current.kind === 'review') await loadReview(current.result_id)
           else if (review) await loadReview(review.review_id)
-          if (location.pathname !== '/jury') navigate('review')
+          if (location.pathname.replace(/\/$/, '') !== '/jury') navigate('review')
           await refreshProjects()
         } else if (['queued', 'running'].includes(current.status)) timer = setTimeout(poll, 1000)
       } catch (e) {
@@ -298,15 +303,7 @@ export default function App() {
         跳到主要内容
       </a>
       <aside className="sidebar">
-        <a
-          className="brand"
-          href="#"
-          onClick={(e) => {
-            e.preventDefault()
-            setProjectId('')
-            navigate('setup')
-          }}
-        >
+        <a className="brand" href="/">
           <span className="brand-symbol">
             <Icon name="scales" size={27} />
           </span>

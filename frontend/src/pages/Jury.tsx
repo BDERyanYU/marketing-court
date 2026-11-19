@@ -104,7 +104,7 @@ export default function Jury({ onMode }: { onMode: (mode: Health) => void }) {
   const remember = (kind: 'report' | 'panel' | 'comparison', id: string) => {
     const url = `/jury?${new URLSearchParams({ [kind]: id })}`
     sessionStorage.setItem('marketing-persona-record', url)
-    if (location.pathname === '/jury') history.replaceState(null, '', url)
+    if (location.pathname.replace(/\/$/, '') === '/jury') history.replaceState(null, '', url)
   }
   const restorePanel = async (id: string) => {
     const saved = await api<PersonaPanel>(`/api/jury/panels/${id}`)

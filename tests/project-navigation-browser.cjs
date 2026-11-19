@@ -17,7 +17,7 @@ async function main() {
       await page.request.get(app + "/api/projects")
     ).json();
     const project = projects.find((p) => p.project_id === fixture.project_id);
-    await page.goto(app);
+    await page.goto(app + "/review");
     await page.locator(".sidebar-project").first().waitFor();
     if (
       await page
