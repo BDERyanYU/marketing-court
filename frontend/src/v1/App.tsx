@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, post } from '../lib/api'
-import type { Asset, CourtCase, Health, Page, Project, Review, Rewrite, Task } from '../lib/types'
+import type { Asset, Health, Page, Project, Review, Rewrite, Task } from '../lib/types'
 import Setup from './pages/Setup'
 import ReviewPage from './pages/Review'
-import Court from './pages/Court'
 
 const STORAGE = 'marketing-court-preserved-v1'
 const stages: Record<string, string> = {
@@ -20,7 +19,7 @@ const stages: Record<string, string> = {
   completed: '处理完成',
 }
 
-function savedSession(): { page?: Page; reviewId?: string; caseId?: string; taskId?: string } {
+function savedSession(): { page?: Page; reviewId?: string; taskId?: string } {
   try {
     return JSON.parse(localStorage.getItem(STORAGE) ?? '{}')
   } catch {
@@ -30,7 +29,7 @@ function savedSession(): { page?: Page; reviewId?: string; caseId?: string; task
 
 export default function App() {
   const initial = useRef(savedSession())
-  const [page, setPage] = useState<Page>(initial.current.page ?? 'setup')
+  const [page, setPage] = useState<Page>(initial.current.page === 'review' ? 'review' : 'setup')
   const [health, setHealth] = useState<Health | null>(null)
   const [projects, setProjects] = useState<Project[]>([])
   const [history, setHistory] = useState<Review[]>([])
@@ -39,13 +38,10 @@ export default function App() {
   const [selectedRisk, setSelectedRisk] = useState('')
   const [rewrites, setRewrites] = useState<Rewrite[]>([])
   const [rechecks, setRechecks] = useState<Record<string, Review>>({})
-  const [court, setCourt] = useState<CourtCase | null>(null)
   const [task, setTask] = useState<Task | null>(null)
   const [busy, setBusy] = useState('')
   const [error, setError] = useState('')
-  const [auto, setAuto] = useState(false)
   const [restored, setRestored] = useState(false)
-  const advancing = useRef(false)
   const refreshProjects = useCallback(
     async () => setProjects(await api<Project[]>('/api/projects')),
     [],
@@ -85,8 +81,6 @@ export default function App() {
         setHealth(status)
         await refreshProjects()
         if (initial.current.reviewId) await loadReview(initial.current.reviewId)
-        if (initial.current.caseId)
-          setCourt(await api<CourtCase>(`/api/cases/${initial.current.caseId}`))
         if (initial.current.taskId) {
           const task = await api<Task>(`/api/tasks/${initial.current.taskId}`)
           setTask(task)
@@ -113,11 +107,10 @@ export default function App() {
         JSON.stringify({
           page,
           reviewId: review?.review_id,
-          caseId: court?.case_id,
           taskId: task?.task_id,
         }),
       )
-  }, [page, review, court, task, restored])
+  }, [page, review, task, restored])
   useEffect(() => {
     if (!task || !['queued', 'running'].includes(task.status)) return
     let stopped = false
@@ -146,38 +139,12 @@ export default function App() {
       clearTimeout(timer)
     }
   }, [task?.task_id, task?.status, review?.review_id, loadReview, refreshProjects])
-  const advance = useCallback(async () => {
-    if (!court?.next_step || advancing.current) return
-    advancing.current = true
-    setBusy('正在生成庭审发言')
-    setError('')
-    try {
-      const result = await post<CourtCase>(`/api/cases/${court.case_id}/advance`, {
-        expected_step: court.next_step,
-      })
-      setCourt(result)
-      if (!result.next_step) setAuto(false)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : '庭审推进失败')
-      setAuto(false)
-    } finally {
-      advancing.current = false
-      setBusy('')
-    }
-  }, [court])
-  useEffect(() => {
-    if (auto && court?.next_step && !busy) {
-      const timer = setTimeout(() => void advance(), 600)
-      return () => clearTimeout(timer)
-    }
-  }, [auto, court, busy, advance])
   const pending = Boolean(task && ['queued', 'running'].includes(task.status))
   const locked = Boolean(busy) || pending
   const chooseReview = (id: string) =>
     action('读取审核版本', async () => {
       await loadReview(id)
       setTask(null)
-      setCourt(null)
       setPage('review')
     })
   return (
@@ -206,7 +173,6 @@ export default function App() {
             [
               ['setup', '01', '项目与素材'],
               ['review', '02', '审核工作台'],
-              ['court', '03', '模拟法庭'],
             ] as const
           ).map(([key, num, label]) => (
             <button
@@ -237,9 +203,7 @@ export default function App() {
         <header className="topbar">
           <span>
             AI Marketing Court{' '}
-            <span className="muted">
-              / {page === 'setup' ? '项目与素材' : page === 'review' ? '审核工作台' : '模拟法庭'}
-            </span>
+            <span className="muted">/ {page === 'setup' ? '项目与素材' : '审核工作台'}</span>
           </span>
           <span className="mode-badge">
             {health?.mode === 'live' ? '实时模型' : '固定演示'} · {health?.model ?? '等待连接'}
@@ -307,7 +271,6 @@ export default function App() {
                   await loadReview(r.review_id)
                   await refreshProjects()
                   setTask(null)
-                  setCourt(null)
                   setPage('review')
                 })
               }
@@ -322,7 +285,6 @@ export default function App() {
                   })
                   setAsset(a)
                   setReview(null)
-                  setCourt(null)
                   setRewrites([])
                   setPage('review')
                   setTask(await post<Task>(`/api/assets/${a.asset_version_id}/reviews`))
@@ -354,27 +316,6 @@ export default function App() {
                   setTask(await post<Task>(`/api/reviews/${review.review_id}/risks/${id}/rewrite`)),
                 )
               }
-              onAppeal={(id) =>
-                void action('打开庭审', async () => {
-                  const cases = await api<CourtCase[]>(`/api/risks/${id}/cases`)
-                  setCourt(
-                    cases.find((c) => c.mode === health?.mode && c.model === health?.model) ??
-                      (await post<CourtCase>(`/api/risks/${id}/appeals`)),
-                  )
-                  setAuto(false)
-                  setPage('court')
-                })
-              }
-            />
-          )}
-          {page === 'court' && (
-            <Court
-              court={court}
-              busy={!!busy}
-              auto={auto}
-              onAuto={() => setAuto((v) => !v)}
-              onAdvance={() => void advance()}
-              onBack={() => setPage('review')}
             />
           )}
         </main>

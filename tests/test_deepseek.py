@@ -5,15 +5,23 @@ import pytest
 
 from backend.app.core.config import provider_from_env
 from backend.app.core.llm import DeepSeekProvider, ModelError
-from backend.app.models import CourtStep, TurnOutput
+from pydantic import BaseModel
 
 
-def complete_prosecution(provider):
+class ProbeOutput(BaseModel):
+    position: str
+    argument: str
+    source_ids: list[str]
+    responds_to: str | None
+    evidence_requested: list[str]
+
+
+def complete_probe(provider):
     return provider.complete(
-        step=CourtStep.PROSECUTION_1,
-        instruction="Return the prosecution argument.",
-        context={"case_facts": {"original_text": "100% Eco-Friendly"}},
-        output=TurnOutput,
+        step="structured_probe",
+        instruction="Return a structured result.",
+        context={"input": {"original_text": "100% Eco-Friendly"}},
+        output=ProbeOutput,
     )
 
 
@@ -27,8 +35,8 @@ def test_deepseek_sends_json_mode_and_parses_a_turn():
         assert request_json["response_format"] == {"type": "json_object"}
         assert "JSON" in request_json["messages"][0]["content"]
         case_context = json.loads(request_json["messages"][1]["content"])
-        assert case_context["step"] == "prosecution_1"
-        assert case_context["case_facts"]["original_text"] == "100% Eco-Friendly"
+        assert case_context["step"] == "structured_probe"
+        assert case_context["input"]["original_text"] == "100% Eco-Friendly"
         turn = {
             "position": "maintain",
             "argument": "The broad claim needs substantiation.",
@@ -41,7 +49,7 @@ def test_deepseek_sends_json_mode_and_parses_a_turn():
         })
 
     provider = DeepSeekProvider("test-only-key", transport=httpx.MockTransport(answer))
-    assert complete_prosecution(provider).source_ids == ["G1"]
+    assert complete_probe(provider).source_ids == ["G1"]
 
 
 @pytest.mark.parametrize(
@@ -60,7 +68,7 @@ def test_deepseek_errors_are_retryable_without_exposing_provider_content(status,
         max_attempts=1,
     )
     with pytest.raises(ModelError) as error:
-        complete_prosecution(provider)
+        complete_probe(provider)
     assert "test-only-key" not in str(error.value)
 
 
@@ -85,7 +93,7 @@ def test_transient_transport_failure_recovers_with_bounded_backoff(failure, monk
         return turn_response()
 
     provider = DeepSeekProvider("test-only-key", transport=httpx.MockTransport(answer))
-    assert complete_prosecution(provider).source_ids == ["G1"]
+    assert complete_probe(provider).source_ids == ["G1"]
     assert len(calls) == 3 and delays == [1, 2]
     assert len({r.content for r in calls}) == 1
     assert "test-only-key" not in caplog.text and "private payload" not in caplog.text
@@ -107,7 +115,7 @@ def test_exhausted_transport_failure_has_safe_actionable_reason(failure, code, m
 
     provider = DeepSeekProvider("test-only-key", transport=httpx.MockTransport(answer))
     with pytest.raises(ModelError) as error:
-        complete_prosecution(provider)
+        complete_probe(provider)
     assert len(calls) == 3
     assert error.value.code == code and error.value.retryable
     assert "重试" in str(error.value) and "test-only-key" not in str(error.value)
@@ -125,7 +133,7 @@ def test_transient_http_failure_recovers(status, monkeypatch):
         return turn_response()
 
     provider = DeepSeekProvider("test-only-key", transport=httpx.MockTransport(answer))
-    assert complete_prosecution(provider).source_ids == ["G1"]
+    assert complete_probe(provider).source_ids == ["G1"]
     assert len(calls) == 2 and delays == [2]
 
 
@@ -138,7 +146,7 @@ def test_configuration_or_account_failure_is_not_automatically_retried(status):
         return httpx.Response(status, json={"error": "test-only-key"})
 
     with pytest.raises(ModelError) as error:
-        complete_prosecution(DeepSeekProvider("test-only-key", transport=httpx.MockTransport(answer)))
+        complete_probe(DeepSeekProvider("test-only-key", transport=httpx.MockTransport(answer)))
     assert len(calls) == 1 and not error.value.retryable
     assert error.value.code == f"deepseek_http_{status}"
     assert "test-only-key" not in str(error.value)
@@ -158,3 +166,38 @@ def test_live_settings_read_the_key_file_and_reject_a_missing_key(tmp_path, monk
     provider = provider_from_env()
     assert provider.mode == "live"
     assert provider.model == "deepseek-flash"
+
+
+def test_native_chat_preserves_messages_budget_and_review_recovery(monkeypatch):
+    calls = []
+    messages = [{"role": "system", "content": "Generate JSON."},
+                {"role": "user", "content": "Native persona input"}]
+    monkeypatch.setattr("backend.app.core.model_api.time.sleep", lambda _: None)
+
+    def answer(request):
+        payload = json.loads(request.content)
+        calls.append(payload)
+        assert payload["messages"] == messages
+        assert payload["max_tokens"] == 8192 and payload["temperature"] == 0.6
+        assert payload["response_format"] == {"type": "json_object"}
+        if len(calls) == 1:
+            raise httpx.RemoteProtocolError("private upstream body", request=request)
+        return httpx.Response(200, json={"choices": [{"finish_reason": "stop", "message": {
+            "content": '{"name":"Example"}'}}]})
+
+    provider = DeepSeekProvider("test-only-key", transport=httpx.MockTransport(answer))
+    assert json.loads(provider.chat(messages, max_tokens=8192, temperature=0.6)["content"]) == {"name": "Example"}
+    assert len(calls) == 2
+
+
+def test_review_retains_large_output_budget_after_native_chat_integration():
+    from backend.app.models.review import ClaimExtraction
+
+    def answer(request):
+        assert json.loads(request.content)["max_tokens"] >= 2400
+        return httpx.Response(200, json={"choices": [{"finish_reason": "stop", "message": {
+            "content": '{"claims":[]}'}}]})
+
+    provider = DeepSeekProvider("test-only-key", transport=httpx.MockTransport(answer))
+    assert provider.complete(step="claim_extraction", instruction="Extract exact claims.",
+                             context={"original_text": "A bottle."}, output=ClaimExtraction).claims == []

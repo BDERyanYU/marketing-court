@@ -41,11 +41,7 @@ class Provider:
             return output.model_validate(dict(assessment="requires_substantiation", severity="high",
                 reason="The broad claim needs matching evidence.", source_ids=[self.source],
                 evidence_gaps=["Product-wide evidence"]))
-        if step == "judgment":
-            return output.model_validate(dict(disposition="insufficient_evidence", reason="Evidence is missing.",
-                source_ids=["G1"], evidence_requested=["Product-wide evidence"]))
-        return output.model_validate(dict(position="challenge", argument="Check the actual claim scope.",
-            source_ids=["G1"], responds_to=context["reply_to"], evidence_requested=[]))
+        raise AssertionError(f"Unexpected model step: {step}")
 
 
 def png():
@@ -71,7 +67,7 @@ def reviewed(client):
     return client.get(f'/api/reviews/{result["result_id"]}').json(), task
 
 
-def test_image_to_review_rewrite_and_court_survives_restart(tmp_path):
+def test_image_review_rewrite_and_export_survive_restart(tmp_path):
     database = tmp_path / "app.sqlite3"
     provider = Provider()
     with TestClient(create_app(database_path=database, provider=provider, ocr=OCR())) as client:
@@ -96,20 +92,10 @@ def test_image_to_review_rewrite_and_court_survives_restart(tmp_path):
         assert client.post(rewrite_path).json()["task_id"] == rewrite_task["task_id"]
         assert client.get(f'/api/reviews/{original["review_id"]}').json() == original
 
-        case = client.post(f'/api/risks/{risk["risk_id"]}/appeals').json()
-        assert case["snapshot"]["original_text"] == original["original_text"]
-        case_id = case["case_id"]
-        assert client.post(f'/api/cases/{case_id}/advance', json={"expected_step": "prosecution_1"}).status_code == 200
-
     with TestClient(create_app(database_path=database, provider=provider, ocr=OCR())) as client:
-        saved = client.get(f'/api/cases/{case_id}').json()
-        assert saved["next_step"] == "defense_1"
-        for step in ("defense_1", "prosecution_2", "defense_2", "judgment"):
-            response = client.post(f'/api/cases/{case_id}/advance', json={"expected_step": step})
-            assert response.status_code == 200, response.text
         report = client.get(f'/api/reviews/{original["review_id"]}/report')
         assert "attachment" in report.headers["content-disposition"]
-        assert report.json()["court_cases"][0]["status"] == "completed"
+        assert "court_cases" not in report.json()
         assert report.json()["rewrites"][0]["recheck"]["risks"] == []
         assert "storage_name" not in report.json()["asset"]
 
@@ -174,7 +160,6 @@ def test_demo_is_separate_and_supports_fixed_rewrite(tmp_path):
         task = client.post(f'/api/reviews/{demo["review_id"]}/risks/demo-eco-bottle/rewrite').json()
         result = client.get(f'/api/tasks/{task["task_id"]}').json()
         assert result["status"] == "completed", result
-        assert client.post('/api/risks/demo-eco-bottle/appeals').status_code == 201
 
 
 def test_multiline_normalized_anchor_mapping_and_unmatched_fallback():

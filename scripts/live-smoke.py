@@ -1,5 +1,6 @@
 """Explicit real-provider exercise; requires a running live-mode local API."""
 
+import argparse
 import json
 import time
 from pathlib import Path
@@ -31,8 +32,8 @@ def wait_task(client, task_id):
     raise TimeoutError("Task exceeded 15 minutes; check its saved server status.")
 
 
-def main():
-    with httpx.Client(base_url="http://127.0.0.1:8000", timeout=120) as client:
+def main(url):
+    with httpx.Client(base_url=url, timeout=120) as client:
         health = checked(client.get("/health"))
         if health["mode"] != "live":
             raise RuntimeError("Real exercise requires COURT_MODE=live and a valid server-side model key.")
@@ -48,17 +49,14 @@ def main():
             raise RuntimeError("Expected sample environmental risk with OCR localization was not returned.")
         rewrite = checked(client.post(f'/api/reviews/{review_id}/risks/{risk["risk_id"]}/rewrite'))
         wait_task(client, rewrite["task_id"])
-        case = checked(client.post(f'/api/risks/{risk["risk_id"]}/appeals'))
-        while case["next_step"]:
-            case = checked(client.post(f'/api/cases/{case["case_id"]}/advance',
-                                       json={"expected_step": case["next_step"]}))
-        assert len(case["turns"]) == 4 and case["judgment"]
         report = checked(client.get(f"/api/reviews/{review_id}/report"))
         target = ROOT / "test-results" / "live-report.json"
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
-        print(f"Real OCR, review, rewrite and court completed. Report: {target}")
+        print(f"Real OCR, review and rewrite completed. Report: {target}")
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--url", default="http://127.0.0.1:8000")
+    main(parser.parse_args().url)

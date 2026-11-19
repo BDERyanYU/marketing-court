@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 
 from backend.app.core.llm import ModelError
 from backend.app.core.store import Store
-from backend.app.court.demo import DemoProvider
+from backend.app.services.review_demo import DemoProvider
 from backend.app.main import create_app
 from backend.app.models.workspace import Meeting
 from backend.app.services.workspace import upsert

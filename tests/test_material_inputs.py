@@ -43,7 +43,6 @@ def test_one_project_accepts_image_text_and_combined_and_restores(tmp_path):
             recheck = client.get(f'/api/reviews/{rewrite["review_id"]}').json()
             assert len(recheck['risks']) == (1 if review['supplied_text'] and review['image_text'] else 0)
             assert client.get(f'/api/reviews/{review["review_id"]}').json() == review
-            assert client.post(f'/api/risks/{risk_id}/appeals').status_code == 201
     with TestClient(create_app(database_path=database, provider=Provider(), ocr=OCR())) as client:
         saved = client.get(f'/api/projects/{project["project_id"]}/reviews').json()
         assert len(saved) == 5  # Three originals plus two separate rechecks.
@@ -52,7 +51,7 @@ def test_one_project_accepts_image_text_and_combined_and_restores(tmp_path):
         assert report['review']['supplied_text'] == both['text']
         assert report['review']['image_text'] == reviews[2]['image_text']
         assert report['project']['product_category'] == 'electronics'
-        assert report['rewrites'] and report['court_cases']
+        assert report['rewrites'] and 'court_cases' not in report
 
 
 @pytest.mark.parametrize('market', ['EU', 'US', 'CA', 'AU', 'CN', 'JP', 'KR', 'SG'])

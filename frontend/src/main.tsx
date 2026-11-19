@@ -6,9 +6,9 @@ async function start() {
   const [{ default: App }] =
     version === 'v1'
       ? await Promise.all([import('./v1/App'), import('./v1/style.css')])
-      : version === 'v2'
-        ? await Promise.all([import('./App'), import('./style.css')])
-        : await Promise.all([import('./v3/App'), import('./v3/style.css')])
+      : version === 'v3'
+        ? await Promise.all([import('./v3/App'), import('./v3/style.css')])
+        : await Promise.all([import('./App'), import('./style.css')])
 
   ReactDOM.createRoot(document.getElementById('root')!).render(
     <React.StrictMode>

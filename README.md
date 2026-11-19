@@ -1,41 +1,20 @@
 # AI Marketing Court
 
-默认界面已更新为 **项目合议版 v3**：以出海营销项目组织图片/文案、多轮审核、用户画像和多角色圆桌。原始设计要求保存在 [产品与界面设计说明](ai-marketing-court-project-design.md)，实现、边界与接口见 [新版说明](docs/workspace-v3.md)。
+当前整合版默认采用**第二版素材审核界面**，合入朋友分支的 TinyTroupe 原生画像派生、营销理论文件和消费者 A/B 并行评价。模拟法庭功能已移除。第三版圆桌工作区保留在 `?ui=v3`，第一版审核布局保留在 `?ui=v1`。
 
-[新版预览](http://127.0.0.1:5173/) · [第二版](http://127.0.0.1:5173/?ui=v2) · [第一版](http://127.0.0.1:5173/?ui=v1)
+完整能力：同一项目图片/文案/联合审核、PaddleOCR 文字坐标、DeepSeek 风险审核、英国 CMA 有限环保规则、改写与一次复核、独立版本、进度恢复、JSON 导出，以及调研报告驱动的消费者模拟。其他市场未接入规则时仅提取文字和宣称。
 
+## 本机启动
 
-面向英国环保广告文字宣称的本机演示应用：提交广告图片、文案或二者 → OCR 与文字提取 → 有来源的风险审核 → 谨慎改写与一次复核 → 两轮控辩 → 独立法官复核。
-
-目前已实现同一项目多次提交、图片/文案/联合审核、PaddleOCR 坐标提取、DeepSeek 文字审核、有限 CMA 规则检索、文案版本、模拟法庭、进度恢复和 JSON 报告。图像语义理解、广告 PDF/DOCX 审核和多人在线部署尚未实现。
-
-已保留远端新增的消费者文案模拟，可从前端侧栏进入独立页面 `/jury`：报告画像提取、情境面板和配对文案比较沿用其现有实现与测试，尚未与广告审核版本自动对接。详见 [消费者模拟](docs/consumer-jury.md)。
-
-界面第二版采用深蓝导航、浅色证据工作台和控辩时间线。第一版源码保存在 `frontend/src/v1/`，可通过 [第一版预览](http://127.0.0.1:5173/?ui=v1) 打开；新版侧栏与手机页脚也提供入口。Git 标签 `ui-v1` 保留改版前完整代码。设计与版本说明见 [界面设计](docs/interface-design.md)。
-
-首页新增 GreenLint v1.2 的两个负面文案案例（英国 Apple Watch、Eco Dog Bed）和一个正面案例（欧盟 Copier Paper），展示包内规则的 1 / 5 / 0 项风险结果。支持文案选择、规则说明、改写复核、庭审与报告导出；原水杯案例保留。案例数据为预设演示，不扩大实时审核覆盖范围，详见 [案例来源与边界](docs/greenlint-cases.md)。
-
-## 项目与素材
-
-每次提交可选“广告图片”“广告文案”或“图片＋文案”，也可选择已有项目添加审核版本。图片仅做文字识别，不含图像语义理解。联合审核会保留原图、输入文案与 OCR 文字；文案中的风险可单独点击，无法匹配原图时不生成坐标。改写保留原始版本，只删除选中风险的一次出现，并复核完整剩余文案。
-
-目标市场提供英国、欧盟、美国、加拿大、澳大利亚、中国大陆、日本、韩国和新加坡；商品类别提供水杯、家居日用、电子家电、服装配饰、美妆个护、食品饮料、宠物、办公纸品、包装与其他消费品。实时规则仍为英国 CMA 通用环保宣称指引摘录，各品类专项规定未接入。其他市场仅保存素材、提取文字与宣称，结果明确标为“未作风险判定”，不借用英国规则。
-
-`POST /api/projects/{id}/assets` 接受表单中的可选 `file` 与可选 `text`（最多 8000 字符），至少一项非空；图片和文案合并识别文字超过 8000 字符时保留素材并提示裁剪重试。原始文案也可使用既有审核启动、改写、庭审和导出接口。
-
-首页四个预设案例统一展示于表单下方，水杯为负面案例，共三个负面案例与一个正面对照。第一版保留。
-
-## 启动固定案例演示
-
-需要 Python 3.12+、[uv](https://docs.astral.sh/uv/)、Node.js 20+ 与 pnpm。在仓库根目录运行：
+需要 Python 3.12+、uv 和 Node.js 20+。
 
 ```powershell
-uv sync --locked
+uv sync --locked --extra ocr
 Copy-Item .env.example .env
-uv run --no-sync --env-file .env uvicorn backend.app.main:create_app --factory --host 127.0.0.1 --port 8000 --workers 1
+.venv/Scripts/python.exe -m uvicorn backend.app.main:create_app --factory --env-file .env --host 127.0.0.1 --port 8000 --workers 1
 ```
 
-另开终端启动前端：
+已有 `.env` 时保留原文件。另开终端：
 
 ```powershell
 cd frontend
@@ -43,39 +22,19 @@ pnpm install --frozen-lockfile
 pnpm dev --host 127.0.0.1
 ```
 
-打开 [本地应用](http://127.0.0.1:5173/)，点击“打开预设案例”。默认无需 API Key，案例文字、坐标、审核结论和庭审发言均来自明确标注的固定数据。固定模式不接受新素材的实时审核。
+打开 [第二版审核](http://127.0.0.1:5173/) 或 [消费者模拟](http://127.0.0.1:5173/jury)。Windows 启动脚本位于 `scripts/`。固定模式支持四个预设案例，不能审核任意新素材。
 
-Windows 也可运行 `scripts/start-backend.ps1` 与 `scripts/start-frontend.ps1`。脚本在当前终端运行，方便直接查看状态；首次先安装依赖。
+## 实时模型与画像
 
-## 启用真实 OCR 与模型
+本机 `.env` 的 `COURT_MODE=live` 控制审核，`JURY_MODE=live` 控制消费者模拟；为兼容已有设置保留这些变量名。两者共用 `DEEPSEEK_API_KEY` 或 `DEEPSEEK_API_KEY_FILE`，默认模型是 `deepseek-flash`。`MARKETING_COURT_MODE` 和 `MARKETING_COURT_DEEPSEEK_MODEL` 可覆盖两者。
 
-```powershell
-uv sync --locked --extra ocr
-```
+消费者模拟默认每批并行评价两位角色，通过 `JURY_MAX_CONCURRENT_MEMBERS` 设置。`JURY_THEORY_SKILL_FILE` 可指向仓库中的 `skills/persona-derivation/SKILL.md`；设置后重启服务生效。TinyTroupe 源码固定于 `vendor/tinytroupe`，MIT 许可证保留；Windows 提示编码和生成结果需通过实际演练验证。
 
-在本机 `.env` 设置：
+DeepSeek 连接中断、超时、限流和临时服务故障最多尝试三次。密钥、余额和参数错误直接提示。审核与 A/B 结果逐步保存，刷新和重启后可以恢复。上游已接收但未返回的请求仍可能在重试时再次计费。
 
-```dotenv
-COURT_MODE=live
-COURT_DEEPSEEK_MODEL=deepseek-flash
-DEEPSEEK_API_KEY=你的密钥
-```
+## 数据与验证
 
-模型名沿用导入庭审模块的默认值，实际可用 ID 以你的账号为准，可通过 `COURT_DEEPSEEK_MODEL` 更换。也可设置 `DEEPSEEK_API_KEY_FILE`，从本机文件读取密钥。不要把真实密钥提交到 Git。
-
-兼容远端的 `MARKETING_COURT_MODE` 与 `MARKETING_COURT_DEEPSEEK_MODEL` 统一配置；如设置，会覆盖审核、庭审与消费者模块的单独模式和模型。`JURY_MODE` 默认使用固定数据。原有 `python -m marketing_court` 启动入口仍可使用。
-
-重启后端后上传 `examples/eco-bottle.png`，即可运行真实图片链路。实时模式也能打开预设审核案例并生成真实庭审；预设审核结果仍会标注来源，其改写复核需要切回固定模式或重新实时审核图片。
-
-PaddleOCR 首次运行会下载识别模型，应在演示前预热：
-
-```powershell
-.venv/Scripts/python.exe scripts/warmup-ocr.py
-```
-
-模型在 `data/paddle-cache`，数据库默认在 `data/marketing_court.sqlite3`，上传文件在 `data/uploads`，均不进 Git。Windows 使用普通终端运行即可；如 OCR 下载失败，检查网络及缓存目录写权限。已禁用存在 Windows 兼容问题的 MKL-DNN 推理选项。
-
-## 测试与真实演练
+SQLite 默认在 `data/marketing_court.sqlite3`，消费者模拟使用独立数据库，上传文件和 Paddle 模型均在本机；密钥、数据库和运行环境不提交代码仓库。预览版使用独立数据副本，`main` 等用户验收后再合并。
 
 ```powershell
 .venv/Scripts/python.exe -m pytest -q
@@ -83,31 +42,6 @@ cd frontend
 pnpm build
 ```
 
-后端测试使用隔离数据库与可控模型，不产生供应商费用。前端依赖包含 Playwright，浏览器脚本默认使用本机 Chrome，可用 `BROWSER_PATH` 指定其他 Chromium 浏览器。前后端启动后，在 `frontend` 运行 `pnpm test:browser`。运行 `pnpm format` 可统一前端格式。
+浏览器测试和真实模型演练见 [整合验收说明](docs/v2-integration.md)。更多内容见 [架构](docs/architecture.md)、[消费者模拟](docs/consumer-jury.md)、[案例边界](docs/greenlint-cases.md)。历史产品说明保留作参考，当前范围以本说明为准。
 
-真实模式后端启动后，运行以下命令，会将示例文字发送至模型并产生 API 费用：
-
-```powershell
-.venv/Scripts/python.exe scripts/live-smoke.py
-```
-
-演练会上传示例图、检查风险定位、运行一次改写复核、完成庭审，并将报告保存到本地 `test-results/live-report.json`。完整供应商验证需要配置有效密钥；脚本不会自动切换到固定模式。
-
-## 模块与接口
-
-- 前端：项目与素材、审核工作台、模拟法庭。
-- 后端：`api` 路由，`models` 共享契约，`core` 配置与存储，`services` OCR/规则/改写，`workflows` 审核编排，`court` 庭审状态与角色。
-- 共享关系：Project → AssetVersion → Review → Claim / RiskItem → CourtCase → DebateTurn / Judgment。
-- 审核任务每秒轮询真实状态；OCR、宣称提取与风险结果可保存检查点。重启后中断任务可重试，已完成结果保留。
-- 庭审采用单进程、逐步推进；失败步骤可重试。已保存步骤重复请求不再调用模型，但进程在供应商返回后、写入数据库前退出仍可能导致重试调用。
-- 上传、任务与庭审 API 见 [本地接口文档](http://127.0.0.1:8000/docs)。项目、资产、审核和庭审均持久化；浏览器记住当前记录。
-
-## 产品边界
-
-仅支持 PNG/JPG、英国普通消费品环保文字宣称和未提供产品证明的案例。CMA 规则包是已核对原文的监管指引摘录，不是完整法律库。未识别到本主题风险不表示广告已获准投放。
-
-改写采用删除选中待补证宣称的保守策略，保留其余原文，不新增产品事实；仅生成文案版本，不修改原图。审核、复核和裁判结果分别保存。
-
-实时 OCR 在本机执行，提取文字和案卷规则发送至 DeepSeek；本地保存原图、文字与结果，不记录密钥。此版本按本机单人使用设计，只绑定 `127.0.0.1`，未实现登录和项目访问权限。
-
-详见 [原始产品说明](AI%20Marketing%20Court%20V1.0.md)、[架构](docs/architecture.md)、[演示脚本](docs/demo-script.md) 和 [验证记录](docs/validation.md)。AI 辅助审核与非正式风险复核不构成法律意见或投放批准。
+AI 辅助审核与消费者模拟不构成法律意见、真实消费者调研或投放批准。

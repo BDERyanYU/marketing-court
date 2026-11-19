@@ -4,7 +4,7 @@ const path = require('node:path')
 
 async function main() {
   const app = process.env.APP_URL || 'http://127.0.0.1:5173'
-  const backend = process.env.API_PROXY_URL || 'http://127.0.0.1:8012'
+  const backend = process.env.API_PROXY_URL || app
   const output = path.resolve('test-results/greenlint-browser')
   fs.mkdirSync(output, { recursive: true })
   const browser = await chromium.launch({ executablePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe', headless: true })
@@ -16,8 +16,10 @@ async function main() {
     const response = await route.fetch({ url: `${backend}${url.pathname}${url.search}` })
     await route.fulfill({ response })
   }
-  await page.route('**/api/**', forward)
-  await page.route('**/health', forward)
+  if (process.env.API_PROXY_URL) {
+    await page.route('**/api/**', forward)
+    await page.route('**/health', forward)
+  }
   try {
     const health = await page.request.get(`${backend}/health`)
     if ((await health.json()).mode !== 'demo') throw new Error('Use an isolated demo backend')
@@ -40,15 +42,8 @@ async function main() {
         await page.getByRole('heading', { name: '文案改写与复核', exact: true }).waitFor()
         const closeTask = page.getByRole('button', { name: '关闭完成提示' })
         if (await closeTask.count()) await closeTask.click()
-        await page.locator('.risk-card.active').getByRole('button', { name: '提出异议' }).click()
-        await page.getByRole('heading', { name: '观点可以交锋，证据必须可查。' }).waitFor()
-        const auto = page.getByRole('button', { name: '自动完成庭审' })
-        if (await auto.count()) await auto.click()
-        await page.getByRole('heading', { name: '证据不足，建议补证' }).waitFor()
-        if (await page.locator('.turn').count() !== 4) throw new Error('Court did not complete four turns')
         await page.reload()
-        await page.getByRole('heading', { name: '证据不足，建议补证' }).waitFor()
-        await page.getByRole('button', { name: '返回审核', exact: true }).click()
+        await page.getByRole('heading', { name: '文案改写与复核', exact: true }).waitFor()
       } else {
         await page.getByRole('heading', { name: '正面对照：未发现明显风险' }).waitFor()
         if (!await page.locator('.intro').first().textContent().then(t => t.includes('欧盟'))) throw new Error('EU sample mislabeled UK')
@@ -76,7 +71,7 @@ async function main() {
     await page.screenshot({ path: path.join(output, 'library-mobile.png'), fullPage: true })
     if (await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)) throw new Error('Library overflows on mobile')
     if (errors.length) throw new Error(errors.join('\n'))
-    console.log('GreenLint browser passed: three cases, exact counts, markets, text selection, rules, rewrite, court, restore, reports, desktop/mobile.')
+    console.log('GreenLint browser passed: three cases, exact counts, markets, text selection, rules, rewrite, restore, reports, desktop/mobile.')
   } finally { await browser.close() }
 }
 main().catch(e => { console.error(e); process.exitCode = 1 })

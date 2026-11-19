@@ -1,9 +1,8 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from backend.app.court.demo import DemoProvider
+from backend.app.services.review_demo import DemoProvider
 from backend.app.main import create_app
-from backend.app.models.court import COURT_STEPS
 from backend.app.services.greenlint import package
 from tests.test_review_api import Provider
 
@@ -46,23 +45,10 @@ def test_imported_cases_preserve_market_text_and_results(tmp_path, case_id, mark
 
 
 @pytest.mark.parametrize("case_id,count", [("apple-watch", 1), ("eco-dog-bed", 5)])
-def test_each_negative_risk_supports_court_and_conservative_rewrite(tmp_path, case_id, count):
+def test_negative_examples_support_conservative_rewrite_and_export(tmp_path, case_id, count):
     database = tmp_path / "cases.db"
     with TestClient(create_app(database_path=database, provider=DemoProvider())) as client:
         review = client.post(f"/api/demo-cases/{case_id}").json()
-        for risk in review["risks"]:
-            case = client.post(f'/api/risks/{risk["risk_id"]}/appeals')
-            assert case.status_code == 201, case.text
-            case = case.json()
-            assert case["snapshot"]["market"] == "GB"
-            assert {s["source_id"] for s in case["snapshot"]["citations"]} == {"G1", "G2"}
-            assert client.post(f'/api/cases/{case["case_id"]}/advance', json={"expected_step": "judgment"}).status_code == 409
-            for step in COURT_STEPS:
-                response = client.post(f'/api/cases/{case["case_id"]}/advance', json={"expected_step": step})
-                assert response.status_code == 200, response.text
-            finished = response.json()
-            assert len(finished["turns"]) == 4 and finished["judgment"]
-            assert client.post(f'/api/cases/{case["case_id"]}/advance', json={"expected_step": "judgment"}).json() == finished
         risk = review["risks"][0]
         path = f'/api/reviews/{review["review_id"]}/risks/{risk["risk_id"]}/rewrite'
         task = client.post(path).json()
@@ -78,10 +64,10 @@ def test_each_negative_risk_supports_court_and_conservative_rewrite(tmp_path, ca
         assert revised_asset["sha256"] != client.get(f'/api/assets/{review["asset_version_id"]}').json()["sha256"]
         assert client.get(f'/api/reviews/{review["review_id"]}').json() == review
         report = client.get(f'/api/reviews/{review["review_id"]}/report').json()
-        assert len(report["court_cases"]) == count
+        assert "court_cases" not in report
         assert report["rewrites"][0]["recheck"] == recheck
     with TestClient(create_app(database_path=database, provider=DemoProvider())) as client:
-        assert client.get(f'/api/cases/{case["case_id"]}').json() == finished
+        assert client.get(f'/api/reviews/{review["review_id"]}').json() == review
 
 
 def test_examples_do_not_call_live_models(tmp_path):

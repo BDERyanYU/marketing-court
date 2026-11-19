@@ -6,7 +6,7 @@ from pathlib import Path
 
 from ..core.llm import ModelError
 from ..core.store import Store, new_id, now
-from ..court.demo import DEMO_INPUT
+from ..services.review_demo import DEMO_INPUT
 from ..models.review import (AssetVersion, ClaimExtraction, Project, Review, Rewrite,
                              RiskAssessment, RiskItem, TextAnchor)
 from ..services.claims import map_claim

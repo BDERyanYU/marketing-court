@@ -7,7 +7,6 @@ from fastapi import APIRouter, BackgroundTasks, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, JSONResponse
 
 from ..core.store import new_id, now
-from ..models.court import CourtInput, PolicyCitation
 from ..models.review import AssetVersion, Project, ProjectRequest, Review, Rewrite, Task
 from ..services.demo import install_demo
 from ..services.greenlint import install_example, list_examples
@@ -17,7 +16,7 @@ from ..services.workspace import upsert
 from ..models.workspace import ReportAddendum
 
 
-def build_review_router(store, workflow, courts, storage: Path):
+def build_review_router(store, workflow, storage: Path):
     router = APIRouter(prefix="/api", tags=["Review"])
 
     @router.get("/projects", response_model=list[Project])
@@ -155,10 +154,9 @@ def build_review_router(store, workflow, courts, storage: Path):
         asset = store.get("asset", review.asset_version_id, AssetVersion)
         project = store.get("project", review.project_id, Project)
         rewrites = store.list("rewrite", Rewrite, review_id)
-        cases = [c.model_dump(mode="json") for c in courts.list_cases() if c.snapshot.review_id == review_id]
         payload = {"project": project.model_dump(mode="json"), "asset": asset.model_dump(mode="json"),
             "roundtable_addenda": [a.model_dump(mode="json") for a in store.list("report_addendum", ReportAddendum, project.project_id) if a.review_id == review_id],
-            "review": review.model_dump(mode="json"), "rewrites": [], "court_cases": cases,
+            "review": review.model_dump(mode="json"), "rewrites": [],
             "human_approval": "not_requested", "disclaimer": "AI 辅助审核与非正式复核，不构成法律意见或投放批准。"}
         payload["asset"].pop("storage_name", None)
         for item in rewrites:
@@ -167,17 +165,3 @@ def build_review_router(store, workflow, courts, storage: Path):
         return JSONResponse(payload, headers={"Content-Disposition": f'attachment; filename="{review_id}.json"'})
 
     return router
-
-
-def snapshot_for_risk(store, risk_id: str) -> CourtInput:
-    for review in store.list("review", Review):
-        risk = next((r for r in review.risks if r.risk_id == risk_id), None)
-        if risk is None:
-            continue
-        citations = [PolicyCitation(source_id=s.source_id, excerpt=s.excerpt, url=s.url)
-                     for s in review.sources if s.source_id in risk.source_ids]
-        return CourtInput(risk_id=risk_id, review_id=review.review_id, asset_version_id=review.asset_version_id,
-            original_text=review.original_text, claim_quote=risk.claim_quote, market=store.get("project", review.project_id, Project).market, assessment=risk.assessment,
-            reason=risk.reason, rule_pack_version=review.rule_pack_version, citations=citations,
-            product_evidence_status="not_supplied")
-    raise HTTPException(404, "未找到该风险的审核记录。")

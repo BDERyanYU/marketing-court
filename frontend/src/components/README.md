@@ -1,3 +1,3 @@
-# 组件规划
+# 可复用组件
 
-后续在此实现 AssetCanvas、RiskPanel、CourtTimeline 等可复用组件。
+AssetCanvas 提供图片标注与文案风险选择，Icon 提供界面图标。

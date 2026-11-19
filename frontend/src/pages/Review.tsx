@@ -15,7 +15,6 @@ interface Props {
   onSetup: () => void
   onRetryStart: () => void
   onRewrite: (id: string) => void
-  onAppeal: (id: string) => void
   onVersion: (id: string) => void
 }
 export default function Review({
@@ -29,7 +28,6 @@ export default function Review({
   onSetup,
   onRetryStart,
   onRewrite,
-  onAppeal,
   onVersion,
 }: Props) {
   if (!asset)
@@ -76,7 +74,7 @@ export default function Review({
           <span>
             {review.example
               ? 'GreenLint v1.2 预设文案：规则匹配在本地重现，不调用实时审核；未提供广告原图。'
-              : '预设案例：文字、坐标与审核结果由人工准备；庭审发言按服务当前模式生成。'}
+              : '预设案例：文字、坐标与审核结果由人工准备，不代表实时模型审核。'}
           </span>
         </div>
       )}
@@ -273,13 +271,6 @@ export default function Review({
                     onClick={() => onRewrite(risk.risk_id)}
                   >
                     {rewrite ? '已生成改写' : '谨慎改写与复核'}
-                  </button>
-                  <button
-                    className="primary"
-                    disabled={busy}
-                    onClick={() => onAppeal(risk.risk_id)}
-                  >
-                    提出异议 <Icon name="scales" size={17} />
                   </button>
                 </div>
               </article>

@@ -1,1 +1,0 @@
-"""Simulated court domain."""

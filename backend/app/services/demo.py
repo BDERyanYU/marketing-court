@@ -4,7 +4,7 @@ import shutil
 from pathlib import Path
 
 from ..core.store import now
-from ..court.demo import DEMO_INPUT
+from .review_demo import DEMO_INPUT
 from ..models.review import AssetVersion, Claim, Project, Review, RiskItem, TextAnchor
 from .parsing import inspect_image
 from .retrieval import RULE_VERSION, retrieve
@@ -38,7 +38,7 @@ def install_demo(store, storage: Path):
         anchors=anchors, claims=[claim], risks=[risk], sources=retrieve("GB", "environmental"),
         rule_pack_version=RULE_VERSION, created_at=now(), limitations=[
             "预设案例：文字、坐标与审核结论为人工准备；不是本次实时 OCR 或审核结果。",
-            "仅演示英国环保宣称；产品证明未提供；审核与裁判不构成法律意见。"])
+            "仅演示英国环保宣称；产品证明未提供；审核不构成法律意见。"])
     with store.connection() as db:
         for kind, identifier, value in [("project", project.project_id, project), ("asset", asset.asset_version_id, asset),
                                          ("review", review.review_id, review)]:

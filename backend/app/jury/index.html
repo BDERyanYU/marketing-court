@@ -43,7 +43,7 @@
 <main>
   <header>
     <h1>营销文案模拟</h1>
-    <p>确认目标画像，观察同一批模拟成员对修改前后的反应。</p>
+    <p>根据调研报告派生角色，观察同一批模拟成员对修改前后的反应。</p>
     <p id="mode" class="muted"></p>
   </header>
   <section>
@@ -58,7 +58,7 @@
     </form>
     <p id="report-name" class="muted spaced"></p>
     <form id="confirm" hidden>
-      <label for="persona">确认目标画像</label>
+      <label for="persona">补充目标画像（可选）</label>
       <select id="persona"></select>
       <div id="traits" class="spaced"></div>
       <div id="manual-wrap" class="spaced" hidden>
@@ -67,9 +67,9 @@
       </div>
       <div class="spaced">
         <label for="count">模拟成员数</label>
-        <input id="count" type="number" min="2" max="5" value="3" required>
+        <input id="count" type="number" min="1" step="1" value="3" required>
       </div>
-      <div class="actions"><button id="derive">确认并派生成员</button></div>
+      <div class="actions"><button id="derive">派生成员</button></div>
     </form>
   </section>
   <section>
@@ -156,7 +156,7 @@
     renderReport();
     renderPanel();
     renderComparison();
-    reportStatus("报告已处理，请确认用于模拟的目标画像。");
+    reportStatus("报告已读取。可以直接派生，也可以补充目标画像。");
   }
 
   function renderReport() {
@@ -165,6 +165,7 @@
     element("confirm").hidden = false;
     const selector = element("persona");
     selector.replaceChildren();
+    add(selector, "option", "仅使用报告正文").value = "report";
     for (const persona of report.personas) add(selector, "option", persona.name).value = persona.persona_id;
     if (report.mode === "live") add(selector, "option", "手动填写画像").value = "manual";
     renderTraits();
@@ -189,26 +190,32 @@
     root.replaceChildren();
     const panel = state.panel;
     if (!panel) return;
-    add(root, "p", panel.base_persona.name + " · " + panel.members.length + " 位模拟成员");
-    add(root, "p", "采用 " + panel.theories.map(theory => theory.title).join("、"), "muted");
+    add(root, "p", (panel.base_persona?.name ?? "根据调研报告") + " · " + panel.members.length + " 位模拟成员");
+    if (panel.theories.length) add(root, "p", "采用 " + panel.theories.map(theory => theory.title).join("、"), "muted");
     if (panel.tinytroupe_plan) {
       const plan = add(root, "details");
       add(plan, "summary", "查看 TinyTroupe 联合抽样计划");
       const groups = add(plan, "ul");
       for (const group of panel.tinytroupe_plan.sample_plan) {
-        const conditions = Object.entries(group.sampled_values).map(([name, value]) => name + "为" + value);
+        const conditions = Object.entries(group.sampled_values).map(([name, value]) =>
+          name + "为" + (typeof value === "string" ? value : JSON.stringify(value)));
         add(groups, "li", conditions.join("、") + " · " + group.quantity + " 个模拟席位");
       }
     }
     const listing = add(root, "div", null, "grid");
     for (const member of panel.members) {
       const item = add(listing, "div", null, "item");
-      add(item, "h3", member.name);
-      add(item, "p", member.situation);
+      add(item, "h3", member.specification?.persona.name ?? member.name);
       const details = add(item, "details");
-      add(details, "summary", "查看派生假设");
-      add(details, "p", member.assumptions.join("；"));
-      add(details, "p", member.persona_prompt, "muted");
+      if (member.specification) {
+        add(details, "summary", "查看原版人物 JSON");
+        add(details, "pre", JSON.stringify(member.specification, null, 2)).style.whiteSpace = "pre-wrap";
+      } else {
+        add(details, "summary", "查看旧版角色描述");
+        add(details, "p", member.situation);
+        add(details, "p", member.assumptions.join("；"));
+        add(details, "p", member.persona_prompt);
+      }
     }
   }
 
@@ -217,7 +224,9 @@
     state.report = await request("/reports/" + state.panel.report_id);
     renderReport();
     const base = state.panel.base_persona;
-    if (state.report.personas.some(persona => persona.persona_id === base.persona_id)) {
+    if (base === null) {
+      element("persona").value = "report";
+    } else if (state.report.personas.some(persona => persona.persona_id === base.persona_id)) {
       element("persona").value = base.persona_id;
     } else {
       element("persona").value = "manual";
@@ -290,10 +299,15 @@
   async function runRemaining() {
     while (state.comparison.next_index != null) {
       const comparison = state.comparison;
-      reportStatus("已保存 " + comparison.next_index + "/" + comparison.total_exposures + " 次独立反馈，正在生成下一条。");
-      state.comparison = await request("/comparisons/" + comparison.comparison_id + "/advance", {
-        expected_index: comparison.next_index
-      });
+      const path = "/comparisons/" + comparison.comparison_id;
+      reportStatus("已保存 " + comparison.exposures.length + "/" + comparison.total_exposures + " 次独立反馈，正在评价下一批成员。");
+      try {
+        state.comparison = await request(path + "/advance-members", {expected_index: comparison.next_index});
+      } catch (error) {
+        state.comparison = await request(path);
+        renderComparison();
+        throw error;
+      }
       renderComparison();
     }
     reportStatus("全部反馈已保存，可以查看配对结果。");
@@ -312,9 +326,10 @@
   element("persona").addEventListener("change", renderTraits);
   element("confirm").addEventListener("submit", event => {
     event.preventDefault();
-    action("正在选择营销理论并通过 TinyTroupe 抽样派生成员。", async () => {
+    action("TinyTroupe 正在根据报告派生成员。", async () => {
       const selected = element("persona").value;
-      const profile = selected === "manual" ? { manual_persona: element("manual").value } : { persona_id: selected };
+      const profile = selected === "report" ? {}
+        : selected === "manual" ? { manual_persona: element("manual").value } : { persona_id: selected };
       state.panel = await request("/panels", {
         report_id: state.report.report_id, ...profile, member_count: Number(element("count").value)
       });

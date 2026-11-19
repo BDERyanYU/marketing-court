@@ -13,7 +13,6 @@ interface Props {
   onSetup: () => void
   onRetryStart: () => void
   onRewrite: (id: string) => void
-  onAppeal: (id: string) => void
   onVersion: (id: string) => void
 }
 export default function Review({
@@ -27,7 +26,6 @@ export default function Review({
   onSetup,
   onRetryStart,
   onRewrite,
-  onAppeal,
   onVersion,
 }: Props) {
   if (!asset)
@@ -63,7 +61,7 @@ export default function Review({
       </div>
       {review?.mode === 'demo' && (
         <div className="notice">
-          预设案例 / 文字、坐标与审核结果由人工准备；庭审发言按服务当前模式生成。
+          预设案例 / 文字、坐标与审核结果由人工准备，不代表实时模型审核。
         </div>
       )}
       <div className="review-grid">
@@ -158,13 +156,6 @@ export default function Review({
                     onClick={() => onRewrite(risk.risk_id)}
                   >
                     {rewrite ? '已生成改写' : '谨慎改写与复核'}
-                  </button>
-                  <button
-                    className="primary"
-                    disabled={busy}
-                    onClick={() => onAppeal(risk.risk_id)}
-                  >
-                    提出异议 ↗
                   </button>
                 </div>
               </article>

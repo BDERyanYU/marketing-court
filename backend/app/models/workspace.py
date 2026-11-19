@@ -4,7 +4,7 @@ from typing import Literal
 
 from pydantic import Field
 
-from .court import StrictModel
+from .common import StrictModel
 from .review import Market, Review
 
 Role = Literal["consumer", "brand", "legal", "creative", "media", "localizer"]

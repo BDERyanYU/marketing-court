@@ -315,7 +315,7 @@ export default function App() {
             <Icon name="scales" size={26} />
           </span>
           <span>
-            <strong>AI Marketing 法庭</strong>
+            <strong>AI Marketing 审核</strong>
             <small>出海营销合议工作台</small>
           </span>
         </a>
@@ -800,7 +800,7 @@ export default function App() {
         </main>
         <footer className="app-footer">
           <span>AI 辅助审核与模拟合议，不构成法律意见、真实消费者调研或投放批准。</span>
-          <span>AI Marketing 法庭 · 项目合议版</span>
+          <span>AI Marketing 审核 · 项目合议版</span>
         </footer>
       </div>
       {material && (

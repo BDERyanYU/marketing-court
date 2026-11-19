@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 
-from ..court.demo import DemoProvider
+from ..services.review_demo import DemoProvider
 from .llm import ModelProvider
 from .model_api import configured_provider
 

@@ -1,6 +1,6 @@
 import type { Market, ProductCategory } from './project-options'
 
-export type Page = 'setup' | 'review' | 'court'
+export type Page = 'setup' | 'review'
 export interface Health {
   status: string
   mode: 'demo' | 'live'
@@ -114,35 +114,4 @@ export interface Rewrite {
   revised_text: string
   removed_text: string
   reason: string
-}
-export interface Turn {
-  step: string
-  round: number
-  role: 'prosecutor' | 'defense'
-  position: string
-  argument: string
-  source_ids: string[]
-  evidence_requested: string[]
-}
-export interface Judgment {
-  disposition: string
-  reason: string
-  source_ids: string[]
-  evidence_requested: string[]
-}
-export interface CourtCase {
-  case_id: string
-  mode: 'demo' | 'live'
-  model: string
-  status: string
-  next_step: string | null
-  snapshot: {
-    market: string
-    risk_id: string
-    claim_quote: string
-    original_text: string
-    citations: { source_id: string; excerpt: string; url: string }[]
-  }
-  turns: Turn[]
-  judgment: Judgment | null
 }

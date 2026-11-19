@@ -11,7 +11,7 @@ from test_review_api import Provider
 
 
 @pytest.mark.skipif(os.environ.get("RUN_PADDLE_OCR") != "1", reason="Opt-in real local OCR and model download")
-def test_real_image_localization_through_review_and_court(tmp_path):
+def test_real_image_localization_and_rewrite(tmp_path):
     image = Path(__file__).resolve().parents[1] / "examples" / "eco-bottle.png"
     with TestClient(create_app(database_path=tmp_path / "app.sqlite3", provider=Provider())) as client:
         project = client.post("/api/projects", json={"name": "Real OCR integration"}).json()
@@ -30,8 +30,3 @@ def test_real_image_localization_through_review_and_court(tmp_path):
         assert all(.1 < y < .25 for x,y in anchor["polygon"])
         rewrite = client.post(f'/api/reviews/{review["review_id"]}/risks/{risk["risk_id"]}/rewrite').json()
         assert client.get(f'/api/tasks/{rewrite["task_id"]}').json()["status"] == "completed"
-        case = client.post(f'/api/risks/{risk["risk_id"]}/appeals').json()
-        for step in ("prosecution_1", "defense_1", "prosecution_2", "defense_2", "judgment"):
-            response = client.post(f'/api/cases/{case["case_id"]}/advance', json={"expected_step": step})
-            assert response.status_code == 200, response.text
-        assert response.json()["status"] == "completed"

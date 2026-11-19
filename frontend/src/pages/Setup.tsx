@@ -77,7 +77,7 @@ export default function Setup({
       <div className="page-heading">
         <div>
           <h1>让每一句宣称，都有据可循。</h1>
-          <p className="intro">从广告素材到规则依据，再到控辩复核。让营销判断多一份证据。</p>
+          <p className="intro">从广告素材到规则依据，再到改写复核。让营销判断多一份证据。</p>
         </div>
         <span className="page-scope">
           <Icon name="shield" size={17} />
@@ -102,8 +102,8 @@ export default function Setup({
         <li>
           <span>3</span>
           <div>
-            <strong>改写或提出异议</strong>
-            <small>复核文案，开启庭审</small>
+            <strong>改写与复核</strong>
+            <small>改写文案，再次复核</small>
           </div>
         </li>
       </ol>
@@ -314,7 +314,7 @@ export default function Setup({
         <div className="section-heading">
           <div>
             <h2>同一套方法，看见风险与边界</h2>
-            <p className="intro">三个负面案例，一个正面对照。选择案例，体验审核、改写与庭审。</p>
+            <p className="intro">三个负面案例，一个正面对照。选择案例，体验审核、改写与复核。</p>
           </div>
           <span className="small-tag">预设案例</span>
         </div>
@@ -326,7 +326,7 @@ export default function Setup({
             </div>
             <h3>水杯「100% 环保」宣称</h3>
             <p>
-              一句整体环保承诺，需要多大范围的证据支持？使用预设广告图，体验原图定位与完整庭审。
+              一句整体环保承诺，需要多大范围的证据支持？使用预设广告图，体验原图定位与改写复核。
             </p>
             <div className="example-open">
               <span>1 处高风险 · 图片预设</span>

@@ -13,7 +13,6 @@ from pathlib import Path
 from fastapi import HTTPException
 
 from ..core.store import now
-from ..models.court import CourtInput, PolicyCitation
 from ..models.review import AssetVersion, Claim, DemoCaseInfo, DemoRule, Project, Review, RiskItem
 from .retrieval import retrieve
 
@@ -142,16 +141,3 @@ def install_example(store, case_id):
         for kind, identifier, value in [("project", project.project_id, project), ("asset", asset.asset_version_id, asset), ("review", review.review_id, review)]:
             db.execute("INSERT OR IGNORE INTO records VALUES (?, ?, ?, ?)", (kind, identifier, project.project_id, value.model_dump_json()))
     return store.get("review", review.review_id, Review)
-
-
-def scripted_input(risk_id):
-    for case in package()[0]["cases"]:
-        review = evaluate(case, case["original_text"])
-        for risk in review.risks:
-            if risk.risk_id == risk_id:
-                return CourtInput(risk_id=risk_id, review_id=review.review_id, asset_version_id=review.asset_version_id,
-                    original_text=review.original_text, claim_quote=risk.claim_quote, market=case["market"],
-                    assessment=risk.assessment, reason=risk.reason, rule_pack_version=VERSION,
-                    citations=[PolicyCitation(source_id=s.source_id, excerpt=s.excerpt, url=s.url) for s in review.sources if s.source_id in risk.source_ids],
-                    product_evidence_status="not_supplied")
-    return None

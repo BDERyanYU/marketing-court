@@ -13,7 +13,7 @@ from . import demo
 from .models import AdvanceRequest, ComparisonRequest, ComparisonView, Panel, PanelRequest, Report
 from .parsing import MAX_FILE_BYTES, ReportError, read_report
 from .repository import JuryRepository
-from .service import JuryError, JuryService
+from .service import DEFAULT_MAX_CONCURRENT_MEMBERS, JuryError, JuryService
 from .theories import TheoryCatalog
 
 
@@ -42,7 +42,15 @@ def register_jury_routes(
         default_path = PROJECT_ROOT / "var" / "consumer-jury.sqlite3"
         database_path = Path(os.environ.get("JURY_DB_PATH", str(default_path))).expanduser()
 
-    service = JuryService(JuryRepository(database_path), provider, TheoryCatalog(skill_path))
+    try:
+        member_limit = int(os.environ.get("JURY_MAX_CONCURRENT_MEMBERS", str(DEFAULT_MAX_CONCURRENT_MEMBERS)))
+        if member_limit < 1:
+            raise ValueError
+    except ValueError:
+        raise RuntimeError("JURY_MAX_CONCURRENT_MEMBERS must be a positive integer.") from None
+    service = JuryService(
+        JuryRepository(database_path), provider, TheoryCatalog(skill_path), max_concurrent_members=member_limit,
+    )
     router = APIRouter(prefix="/api/jury", tags=["Consumer Jury"])
 
     @app.get(page_path, include_in_schema=False)
@@ -83,6 +91,10 @@ def register_jury_routes(
     @router.post("/comparisons/{comparison_id}/advance", response_model=ComparisonView)
     def advance(comparison_id: UUID, request: AdvanceRequest) -> ComparisonView:
         return service.advance(comparison_id, request.expected_index)
+
+    @router.post("/comparisons/{comparison_id}/advance-members", response_model=ComparisonView)
+    def advance_members(comparison_id: UUID, request: AdvanceRequest) -> ComparisonView:
+        return service.advance(comparison_id, request.expected_index, parallel=True)
 
     @app.exception_handler(ReportError)
     @app.exception_handler(JuryError)

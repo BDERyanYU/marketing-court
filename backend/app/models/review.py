@@ -5,7 +5,7 @@ from typing import Literal
 
 from pydantic import Field
 
-from .court import Identifier, StrictModel
+from .common import Identifier, StrictModel
 
 
 Market = Literal["GB", "EU", "US", "CA", "AU", "CN", "JP", "KR", "SG"]
