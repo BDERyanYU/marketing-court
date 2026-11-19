@@ -9,7 +9,6 @@ export default defineConfig(({ mode }) => {
       proxy: {
         '/api': backend,
         '/health': backend,
-        '/jury': backend,
       },
     },
   }

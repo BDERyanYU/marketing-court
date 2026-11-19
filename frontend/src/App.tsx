@@ -5,7 +5,9 @@ import type { Asset, DemoCase, Health, Page, Project, Review, Rewrite, Task } fr
 import Setup from './pages/Setup'
 import ReviewPage from './pages/Review'
 import ProjectPage from './pages/Project'
+import Jury from './pages/Jury'
 import Icon from './components/Icon'
+import './persona.css'
 
 const STORAGE = 'marketing-court-session-v1'
 
@@ -20,8 +22,33 @@ function savedSession(): { page?: Page; projectId?: string; reviewId?: string; t
 export default function App() {
   const initial = useRef(savedSession())
   const [page, setPage] = useState<Page>(
-    ['review', 'project'].includes(initial.current.page ?? '') ? initial.current.page! : 'setup',
+    location.pathname === '/jury'
+      ? 'persona'
+      : ['review', 'project'].includes(initial.current.page ?? '')
+        ? initial.current.page!
+        : 'setup',
   )
+  const [personaVisited, setPersonaVisited] = useState(location.pathname === '/jury')
+  const [personaHealth, setPersonaHealth] = useState<Health | null>(null)
+  const navigate = useCallback((next: Page) => {
+    setPage(next)
+    if (next === 'persona') {
+      setPersonaVisited(true)
+      if (location.pathname !== '/jury') {
+        const saved = sessionStorage.getItem('marketing-persona-record')
+        window.history.pushState(null, '', saved?.startsWith('/jury?') ? saved : '/jury')
+      }
+    } else if (location.pathname === '/jury') window.history.pushState(null, '', '/')
+  }, [])
+  useEffect(() => {
+    const sync = () => {
+      const isPersona = location.pathname === '/jury'
+      if (isPersona) setPersonaVisited(true)
+      setPage(isPersona ? 'persona' : 'setup')
+    }
+    addEventListener('popstate', sync)
+    return () => removeEventListener('popstate', sync)
+  }, [])
   const [projectId, setProjectId] = useState(initial.current.projectId ?? '')
   const [health, setHealth] = useState<Health | null>(null)
   const [projects, setProjects] = useState<Project[]>([])
@@ -149,7 +176,7 @@ export default function App() {
         if (current.status === 'completed' && current.result_id) {
           if (current.kind === 'review') await loadReview(current.result_id)
           else if (review) await loadReview(review.review_id)
-          setPage('review')
+          if (location.pathname !== '/jury') navigate('review')
           await refreshProjects()
         } else if (['queued', 'running'].includes(current.status)) timer = setTimeout(poll, 1000)
       } catch (e) {
@@ -167,18 +194,19 @@ export default function App() {
   }, [task?.task_id, task?.status, review?.review_id, loadReview, refreshProjects])
   const pending = Boolean(task && ['queued', 'running'].includes(task.status))
   const locked = Boolean(busy) || pending
+  const visibleHealth = page === 'persona' ? personaHealth : health
   const selectedProject = projects.find((p) => p.project_id === projectId)
   const openProject = (id: string) => {
     setProjectId(id)
     setHistoryReload((value) => value + 1)
-    setPage('project')
+    navigate('project')
     setError('')
   }
   const chooseReview = (id: string) =>
     action('读取审核版本', async () => {
       await loadReview(id)
       setTask(null)
-      setPage('review')
+      navigate('review')
     })
   return (
     <div className="app-layout">
@@ -192,7 +220,7 @@ export default function App() {
           onClick={(e) => {
             e.preventDefault()
             setProjectId('')
-            setPage('setup')
+            navigate('setup')
           }}
         >
           <span className="brand-symbol">
@@ -209,10 +237,16 @@ export default function App() {
             aria-current={page === 'setup' && !projectId ? 'page' : undefined}
             onClick={() => {
               setProjectId('')
-              setPage('setup')
+              navigate('setup')
             }}
           >
             <Icon name="folder" /> 项目与素材 <span className="nav-indicator" />
+          </button>
+          <button
+            aria-current={page === 'persona' ? 'page' : undefined}
+            onClick={() => navigate('persona')}
+          >
+            <Icon name="spark" /> 数字人像测试 <span className="nav-indicator" />
           </button>
           <div className="sidebar-project-heading">
             我的项目 <span>{projects.length}</span>
@@ -223,7 +257,9 @@ export default function App() {
                 key={project.project_id}
                 className="sidebar-project"
                 title={project.name}
-                aria-current={projectId === project.project_id ? 'page' : undefined}
+                aria-current={
+                  page !== 'persona' && projectId === project.project_id ? 'page' : undefined
+                }
                 disabled={locked}
                 onClick={() => openProject(project.project_id)}
               >
@@ -237,11 +273,6 @@ export default function App() {
             )}
           </div>
         </nav>
-        <a className="jury-link" href="/jury" aria-label="消费者模拟（独立页面）">
-          <Icon name="spark" size={18} />
-          <span>消费者模拟</span>
-          <Icon name="external" size={14} />
-        </a>
         <div className="workspace-note">
           <Icon name="shield" size={24} />
           <strong>让判断回到证据</strong>
@@ -263,14 +294,14 @@ export default function App() {
             <span>本地工作空间</span>
             <Icon name="chevron" size={13} />
             <strong>
-              {selectedProject?.name ?? '项目与素材'}
+              {page === 'persona' ? '数字人像测试' : (selectedProject?.name ?? '项目与素材')}
               {page === 'review' ? ' / 审核报告' : ''}
             </strong>
           </div>
           <span className="mode-badge">
-            <span className={`status-dot ${health ? 'online' : ''}`} />
-            {health ? (health.mode === 'live' ? '实时模型' : '固定演示') : '等待连接'}
-            {health && <span className="model-name">{health.model}</span>}
+            <span className={`status-dot ${visibleHealth ? 'online' : ''}`} />
+            {visibleHealth ? (visibleHealth.mode === 'live' ? '实时模型' : '固定演示') : '等待连接'}
+            {visibleHealth && <span className="model-name">{visibleHealth.model}</span>}
           </span>
         </header>
         <main id="main-content">
@@ -282,7 +313,7 @@ export default function App() {
               </button>
             </div>
           )}
-          {task && (
+          {page !== 'persona' && task && (
             <div
               className={`task-banner ${['failed', 'interrupted'].includes(task.status) ? 'failed' : ''}`}
               role="status"
@@ -318,6 +349,11 @@ export default function App() {
               )}
             </div>
           )}
+          {personaVisited && (
+            <div hidden={page !== 'persona'}>
+              <Jury onMode={setPersonaHealth} />
+            </div>
+          )}
           {page === 'setup' && (
             <Setup
               health={health}
@@ -332,7 +368,7 @@ export default function App() {
                   await loadReview(r.review_id)
                   await refreshProjects()
                   setTask(null)
-                  setPage('review')
+                  navigate('review')
                 })
               }
               onDemo={() =>
@@ -341,7 +377,7 @@ export default function App() {
                   await loadReview(r.review_id)
                   await refreshProjects()
                   setTask(null)
-                  setPage('review')
+                  navigate('review')
                 })
               }
               onUpload={(project, file, text, projectId) =>
@@ -361,7 +397,7 @@ export default function App() {
                   setReview(null)
                   setTask(null)
                   setRewrites([])
-                  setPage('review')
+                  navigate('review')
                   setTask(await post<Task>(`/api/assets/${a.asset_version_id}/reviews`))
                   await refreshProjects()
                 })
@@ -376,7 +412,7 @@ export default function App() {
               onRetry={() => setHistoryReload((value) => value + 1)}
               busy={locked}
               onOpen={(id) => void chooseReview(id)}
-              onAdd={() => setPage('setup')}
+              onAdd={() => navigate('setup')}
             />
           )}
           {page === 'review' && (
@@ -388,7 +424,7 @@ export default function App() {
               rechecks={rechecks}
               busy={locked}
               onSelect={setSelectedRisk}
-              onSetup={() => setPage(selectedProject ? 'project' : 'setup')}
+              onSetup={() => navigate(selectedProject ? 'project' : 'setup')}
               onVersion={(id) => void chooseReview(id)}
               onRetryStart={() =>
                 asset &&
@@ -408,7 +444,7 @@ export default function App() {
         <footer>
           <span>
             <Icon name="shield" size={14} />
-            AI 辅助审核与消费者模拟，不构成法律意见或投放批准。
+            AI 辅助审核与数字人像测试，不构成法律意见或投放批准。
           </span>
           <a className="mobile-version-link" href="/?ui=v1">
             查看第一版
