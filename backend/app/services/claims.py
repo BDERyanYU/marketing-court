@@ -14,10 +14,11 @@ def normalized(text: str):
 def map_claim(item: ExtractedClaim, anchors: list[TextAnchor]) -> Claim:
     target = normalized(item.claim_text)
     selected = []
-    for start in range(len(anchors)):
-        for end in range(start + 1, min(len(anchors), start + 8) + 1):
+    for length in range(1, min(len(anchors), 8) + 1):
+        for start in range(len(anchors) - length + 1):
+            end = start + length
             candidate = normalized(" ".join(a.text for a in anchors[start:end]))
-            if target in candidate:
+            if target in candidate and all(a.score >= 0.8 for a in anchors[start:end]):
                 selected = anchors[start:end]
                 break
         if selected:

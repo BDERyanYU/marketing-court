@@ -16,6 +16,9 @@ from .core.store import Store
 from .services.ocr import PaddleOCRService
 from .workflows.review import ReviewWorkflow
 
+# uvicorn loads .env before importing the app; Paddle models remain local to this project.
+os.environ.setdefault("PADDLE_PDX_CACHE_HOME", str(Path(__file__).resolve().parents[2] / "data" / "paddle-cache"))
+
 
 def create_app(*, database_path: Path | None = None, provider: ModelProvider | None = None,
                storage_path: Path | None = None, ocr=None) -> FastAPI:

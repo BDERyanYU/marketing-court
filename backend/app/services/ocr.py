@@ -2,12 +2,15 @@
 
 import math
 import os
+import logging
 from pathlib import Path
 from threading import Lock
 
 from ..core.llm import ModelError
 from ..core.store import new_id
 from ..models.review import TextAnchor
+
+logger = logging.getLogger(__name__)
 
 
 class PaddleOCRService:
@@ -22,7 +25,8 @@ class PaddleOCRService:
                     os.environ.setdefault("PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK", "True")
                     from paddleocr import PaddleOCR
                     self._engine = PaddleOCR(lang="en", use_doc_orientation_classify=False,
-                                             use_doc_unwarping=False, use_textline_orientation=False)
+                                             use_doc_unwarping=False, use_textline_orientation=False,
+                                             enable_mkldnn=False)
                 results = list(self._engine.predict(str(path)))
                 anchors = []
                 for result in results:
@@ -42,5 +46,6 @@ class PaddleOCRService:
                 raise ModelError("OCR 依赖尚未安装。请先执行 uv sync --extra ocr 并准备 PaddleOCR 模型。") from None
             except ModelError:
                 raise
-            except Exception:
+            except Exception as error:
+                logger.error("OCR failed: %s", type(error).__name__)
                 raise ModelError("OCR 解析失败，请检查 PaddleOCR 安装与模型下载后重试。") from None

@@ -185,3 +185,8 @@ def test_multiline_normalized_anchor_mapping_and_unmatched_fallback():
     unmatched = map_claim(ExtractedClaim(claim_text="Unrecognized text",claim_type="environmental"),anchors)
     assert unmatched.location_status == "needs_confirmation"
     assert unmatched.anchor_ids == []
+    exact = map_claim(ExtractedClaim(claim_text="Eco-Friendly",claim_type="environmental"),anchors)
+    assert exact.anchor_ids == ["1"]
+    anchors[1].score = .6
+    uncertain = map_claim(ExtractedClaim(claim_text="Eco-Friendly",claim_type="environmental"),anchors)
+    assert uncertain.location_status == "needs_confirmation"

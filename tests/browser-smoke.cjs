@@ -1,0 +1,53 @@
+/* Uses the installed browser and Playwright package supplied through environment. */
+const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright')
+const fs = require('node:fs')
+const path = require('node:path')
+
+async function main() {
+  fs.mkdirSync('test-results', { recursive: true })
+  const browser = await chromium.launch({ executablePath: process.env.BROWSER_PATH || 'C:/Program Files/Google/Chrome/Application/chrome.exe', headless: true })
+  const page = await browser.newPage({ viewport: { width: 1440, height: 1100 } })
+  const errors = []
+  page.on('pageerror', e => errors.push(e.message))
+  try {
+    await page.goto('http://127.0.0.1:5173/')
+    await page.getByRole('button', { name: '打开预设案例' }).waitFor()
+    await page.screenshot({ path: 'test-results/setup-desktop.png', fullPage: true })
+    await page.getByRole('button', { name: '打开预设案例' }).click()
+    await page.getByRole('heading', { name: '每项风险，都能追溯。' }).waitFor()
+    await page.getByRole('button', { name: '查看风险：100% Eco-Friendly' }).waitFor()
+    await page.locator('.asset-canvas img').evaluate(img => img.decode())
+    if (!await page.locator('.asset-canvas img').evaluate(img => img.naturalWidth === 1000)) throw new Error('Asset image did not load')
+    await page.screenshot({ path: 'test-results/review-desktop.png', fullPage: true })
+    const rewrite = page.getByRole('button', { name: '谨慎改写与复核' })
+    if (await rewrite.count()) await rewrite.click()
+    await page.getByRole('heading', { name: '文案改写与复核', exact: true }).waitFor()
+    await page.getByRole('button', { name: '提出异议' }).click()
+    await page.getByRole('heading', { name: '观点可以交锋，证据必须可查。' }).waitFor()
+    const advance = page.getByRole('button', { name: '推进下一步' })
+    if (await advance.count()) {
+      await advance.click()
+      await page.getByText('第一轮 · 辩方', { exact: false }).waitFor()
+      await page.reload()
+      await page.getByText('第一轮 · 辩方', { exact: false }).waitFor()
+      await page.getByRole('button', { name: '自动完成庭审' }).click()
+    }
+    await page.getByRole('heading', { name: '证据不足，建议补证' }).waitFor({ timeout: 30000 })
+    await page.screenshot({ path: 'test-results/court-desktop.png', fullPage: true })
+    await page.reload()
+    await page.getByRole('heading', { name: '证据不足，建议补证' }).waitFor()
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.screenshot({ path: 'test-results/court-mobile.png', fullPage: true })
+    if (await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)) throw new Error('Mobile layout overflows viewport')
+    await page.getByRole('button', { name: '返回审核' }).click()
+    await page.getByRole('heading', { name: '每项风险，都能追溯。' }).waitFor()
+    const download = page.waitForEvent('download')
+    await page.getByRole('link', { name: '导出 JSON 报告' }).click()
+    await (await download).saveAs(path.resolve('test-results/report.json'))
+    const report = JSON.parse(fs.readFileSync('test-results/report.json', 'utf8'))
+    if (!report.court_cases.some(c => c.status === 'completed') || !report.rewrites.length) throw new Error('Incomplete exported report')
+    if (errors.length) throw new Error(errors.join('\n'))
+    console.log('Browser flow passed: fixture, overlay, rewrite, court, refresh, mobile, JSON export.')
+  } finally { await browser.close() }
+}
+main().catch(e => { console.error(e); process.exitCode = 1 })
