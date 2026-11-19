@@ -85,11 +85,16 @@ def evaluate(case, text, *, review_id=None, asset_id=None):
             if any(hit(t.lower(), low) for t in rule["triggers"]):
                 matched.append(rule)
         fallback = not matched and any(hit(t, low) for t in ["environment", "planet", "eco", "green", "sustain"])
+        claim_id = f'{namespace}-claim-{index}'
+        markers = any(c in low for c in CERTS) or (re.search(r"\d+\s*%", sentence) and any(m in low for m in MATERIALS))
+        if not matched and not fallback and markers:
+            claims.append(Claim(claim_id=claim_id, claim_text=sentence, claim_type="environmental",
+                                input_origin="text", anchor_ids=[], location_status="needs_confirmation"))
         if not matched and not fallback:
             continue
         claim_id = f'{namespace}-claim-{index}'
         claim = Claim(claim_id=claim_id, claim_text=sentence, claim_type="environmental",
-                      anchor_ids=[], location_status="needs_confirmation")
+                      input_origin="text", anchor_ids=[], location_status="needs_confirmation")
         claims.append(claim)
         markers = any(c in low for c in CERTS) or (re.search(r"\d+\s*%", sentence) and any(m in low for m in MATERIALS))
         high = not markers and any(r["severity"] == "high" for r in matched)
@@ -101,6 +106,7 @@ def evaluate(case, text, *, review_id=None, asset_id=None):
         else:
             explanations = "包内规则的关注点：" + (explanations or "环保相关表达需要证据支持。")
         risks.append(RiskItem(risk_id=f'{namespace}-risk-{index}',
+            input_origin="text",
             claim_id=claim_id, claim_quote=sentence, assessment="requires_substantiation",
             severity="high" if high else "medium", reason=prefix + explanations,
             source_ids=["G1", "G2"] if case["market"] == "GB" else [], evidence_gaps=gaps[:5],

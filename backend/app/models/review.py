@@ -17,7 +17,7 @@ class ProjectRequest(StrictModel):
     name: str = Field(min_length=1, max_length=100)
     market: Market = "GB"
     product_category: ProductCategory = "reusable_bottle"
-    channel: Literal["general_advertising"] = "general_advertising"
+    channel: Literal["general_advertising", "meta", "google", "tiktok", "amazon", "website", "email"] = "general_advertising"
 
 
 class Project(ProjectRequest):
@@ -26,6 +26,8 @@ class Project(ProjectRequest):
 
 
 class AssetVersion(StrictModel):
+    language: str = "英语"
+    origin_meeting_id: str | None = None
     asset_version_id: str
     project_id: str
     kind: Literal["image", "copy", "text"] = "image"
@@ -123,6 +125,8 @@ class DemoRule(StrictModel):
 
 
 class Review(StrictModel):
+    audience_context: dict = Field(default_factory=dict)
+    audience_fit: dict | None = None
     image_text: str = ""
     supplied_text: str = ""
     market: Market = "GB"

@@ -12,6 +12,9 @@ from ..models.review import AssetVersion, Project, ProjectRequest, Review, Rewri
 from ..services.demo import install_demo
 from ..services.greenlint import install_example, list_examples
 from ..services.parsing import MAX_UPLOAD_BYTES, inspect_image
+from ..services.workspace import context_for
+from ..services.workspace import upsert
+from ..models.workspace import ReportAddendum
 
 
 def build_review_router(store, workflow, courts, storage: Path):
@@ -37,6 +40,7 @@ def build_review_router(store, workflow, courts, storage: Path):
                 raise HTTPException(422, "请添加广告图片或输入广告文案，至少提供一项。")
             asset_id = new_id("asset")
             asset = AssetVersion(asset_version_id=asset_id, project_id=project_id, kind="text",
+                language=context_for(store, project_id).language,
                 original_filename="广告文案", sha256=hashlib.sha256(text.encode()).hexdigest(),
                 width=0, height=0, image_url="", storage_name="", text=text, created_at=now())
             store.add("asset", asset_id, project_id, asset)
@@ -49,6 +53,7 @@ def build_review_router(store, workflow, courts, storage: Path):
         storage.mkdir(parents=True, exist_ok=True)
         (storage / filename).write_bytes(content)
         asset = AssetVersion(asset_version_id=asset_id, project_id=project_id,
+            language=context_for(store, project_id).language,
             original_filename=Path(file.filename or "upload").name[:200], sha256=digest, width=width,
             height=height, storage_name=filename, image_url=f"/api/assets/{asset_id}/image",
             text=text or None, created_at=now())
@@ -82,6 +87,10 @@ def build_review_router(store, workflow, courts, storage: Path):
             raise HTTPException(409, "文案版本通过改写复核流程生成。")
         if workflow.provider.mode != "live":
             raise HTTPException(409, "新素材需要实时模式，请先配置 DeepSeek；图片审核还需 OCR。也可打开预设案例。")
+        context = context_for(store, item.project_id)
+        if context.archived:
+            context.archived = False
+            upsert(store, "project_context", item.project_id, item.project_id, context)
         task, fresh = store.start_task("review", asset_id, workflow.provider.mode, workflow.provider.model)
         if fresh:
             background.add_task(workflow.run, task.task_id)
@@ -148,6 +157,7 @@ def build_review_router(store, workflow, courts, storage: Path):
         rewrites = store.list("rewrite", Rewrite, review_id)
         cases = [c.model_dump(mode="json") for c in courts.list_cases() if c.snapshot.review_id == review_id]
         payload = {"project": project.model_dump(mode="json"), "asset": asset.model_dump(mode="json"),
+            "roundtable_addenda": [a.model_dump(mode="json") for a in store.list("report_addendum", ReportAddendum, project.project_id) if a.review_id == review_id],
             "review": review.model_dump(mode="json"), "rewrites": [], "court_cases": cases,
             "human_approval": "not_requested", "disclaimer": "AI 辅助审核与非正式复核，不构成法律意见或投放批准。"}
         payload["asset"].pop("storage_name", None)

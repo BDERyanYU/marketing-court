@@ -11,7 +11,7 @@ async function main() {
   const backend = process.env.API_PROXY_URL || 'http://127.0.0.1:8013'
   const campaignName = `联合审核验证 ${Date.now()}`
   try {
-    await page.goto(process.env.APP_URL || 'http://127.0.0.1:5177')
+    await page.goto(`${process.env.APP_URL || 'http://127.0.0.1:5177'}/?ui=v2`)
     await page.locator('.example-card').nth(3).waitFor()
     if (await page.locator('.example-card.negative').count() !== 3 || await page.locator('.example-card.positive').count() !== 1) throw new Error('Expected 3 negative, 1 positive in the same library')
     if (await page.locator('.setup-grid .example-card, .setup-grid .demo-card').count()) throw new Error('Example is still beside the form')

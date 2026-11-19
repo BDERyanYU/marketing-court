@@ -21,7 +21,7 @@ async function main() {
   try {
     const health = await page.request.get(`${backend}/health`)
     if ((await health.json()).mode !== 'demo') throw new Error('Use an isolated demo backend')
-    await page.goto(app)
+    await page.goto(`${app}/?ui=v2`)
     await page.getByRole('heading', { name: '同一套方法，看见风险与边界' }).waitFor()
     await page.screenshot({ path: path.join(output, 'library-desktop.png'), fullPage: true })
     for (const [id, title, count] of [['apple-watch', 'Apple Watch 碳中和宣称', 1], ['eco-dog-bed', 'Eco Dog Bed 环保系列宣称', 5], ['copier-paper', 'Copier Paper 再生纸文案', 0]]) {

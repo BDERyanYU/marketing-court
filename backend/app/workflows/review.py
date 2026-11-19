@@ -13,6 +13,8 @@ from ..services.claims import map_claim
 from ..services.retrieval import RULE_VERSION, retrieve
 from ..services.rewrite import remove_claim
 from ..services.greenlint import case_data, evaluate
+from ..services.workspace import audience_snapshot
+from ..models.workspace import AudienceFit
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +36,10 @@ class ReviewWorkflow:
 
         if len(text) > 8000:
             raise ModelError("识别文字超过演示版 8000 字符上限，请裁剪素材后重试。")
+        context_key = key("audience_context")
+        if context_key not in task.checkpoints:
+            self.checkpoint(task, key("context_frozen"), **{context_key: audience_snapshot(self.store, project.project_id)})
+        audience = task.checkpoints[context_key]
         cached = task.checkpoints.get(key("claims"))
         if cached is None:
             if self.provider.mode == "demo":
@@ -48,7 +54,8 @@ class ReviewWorkflow:
                     instruction=("提取广告中的可审核宣称。claim_text 必须逐字复制 original_text 的连续片段，不得改写。"
                                  "环保相关标 environmental，其余为 other；不要为普通产品名称制造宣称。"),
                     context={"original_text": text, "market": project.market,
-                             "product_category": project.product_category}, output=ClaimExtraction)
+                             "product_category": project.product_category, "audience": audience,
+                             "channel": project.channel}, output=ClaimExtraction)
             if any(c.claim_text not in text for c in extraction.claims):
                 raise ModelError("模型宣称未逐字对应原文，未保存审核结论，请重试。")
             claims = [map_claim(c, anchors) for c in extraction.claims]
@@ -84,6 +91,7 @@ class ReviewWorkflow:
                                      "必须引用 sources 内的 source_id。仅给风险复核意见，不能批准投放或断言违法。"),
                         context={"original_text": text, "claim": claim.model_dump(), "market": project.market,
                                  "product_category": project.product_category,
+                                 "audience": audience, "channel": project.channel,
                                  "sources": [s.model_dump() for s in applicable], "product_evidence_status": "not_supplied"},
                         output=RiskAssessment)
                 allowed = {s.source_id for s in applicable}
@@ -95,7 +103,14 @@ class ReviewWorkflow:
                 risks.append(RiskItem(**assessment, risk_id=new_id("risk"), claim_id=claim.claim_id,
                     input_origin=claim.input_origin,
                     claim_quote=claim.claim_text, anchor_ids=claim.anchor_ids, location_status=claim.location_status))
+        fit = task.checkpoints.get(key("audience_fit"))
+        if audience.get("personas") and fit is None and self.provider.mode == "live":
+            fit = self.provider.complete(step="audience_fit",
+                instruction="定性评估素材与提供画像的匹配关系，用中文，不虚构受众数据或分数。画像是待验证假设，不替代市场研究。",
+                context={"original_text": text, "audience": audience, "market": project.market}, output=AudienceFit).model_dump()
+            self.checkpoint(task, key("audience_checked"), **{key("audience_fit"): fit})
         return Review(review_id=new_id("review"), asset_version_id=asset.asset_version_id,
+            audience_context=audience, audience_fit=fit,
             market=project.market, product_category=project.product_category,
             coverage_status="limited" if sources else "unsupported",
             project_id=project.project_id, mode=self.provider.mode, model=self.provider.model,

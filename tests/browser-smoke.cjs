@@ -33,7 +33,7 @@ async function main() {
   try {
     const health = await page.request.get(`${backendUrl || appUrl}/health`)
     if (!health.ok() || (await health.json()).mode !== 'demo') throw new Error('Browser smoke requires a demo backend; use API_PROXY_URL to target an isolated demo server.')
-    await page.goto(appUrl)
+    await page.goto(`${appUrl}/?ui=v2`)
     await page.getByRole('button', { name: '打开预设案例' }).waitFor()
     for (const name of ['目标市场', '商品类别']) {
       const select = page.getByRole('combobox', { name, exact: true })
@@ -93,7 +93,7 @@ async function main() {
     if (!await page.getByRole('combobox', { name: '目标市场', exact: true }).isEnabled()) throw new Error('Preserved v1 market selector is disabled')
     await page.getByRole('button', { name: '打开预设案例' }).click()
     await page.getByRole('heading', { name: '每项风险，都能追溯。' }).waitFor()
-    await page.goto(appUrl)
+    await page.goto(`${appUrl}/?ui=v2`)
     await page.getByRole('heading', { name: '每项风险，都能追溯。' }).waitFor()
     if (await page.locator('.sidebar').evaluate(el => getComputedStyle(el).backgroundColor) === originalBackground) throw new Error('Original and redesigned styles are not isolated')
     const uploadPage = await browser.newPage()
@@ -119,7 +119,7 @@ async function main() {
       throw new Error(`Unexpected upload request: ${endpoint}`)
     })
     await uploadPage.route('**/examples/eco-bottle.png', route => route.fulfill({ path: path.resolve('examples/eco-bottle.png') }))
-    await uploadPage.goto(appUrl)
+    await uploadPage.goto(`${appUrl}/?ui=v2`)
     await uploadPage.getByLabel('项目名称', { exact: true }).fill('新版上传验证')
     await uploadPage.getByLabel('选择广告图片').setInputFiles('examples/eco-bottle.png')
     await uploadPage.getByRole('button', { name: '上传并开始审核' }).click()

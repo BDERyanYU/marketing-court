@@ -16,6 +16,8 @@ from .core.store import Store
 from .services.ocr import PaddleOCRService
 from .workflows.review import ReviewWorkflow
 from .jury.main import register_jury_routes
+from .api.workspace import build_workspace_router
+from .services.workspace import recover_meetings
 
 # uvicorn loads .env before importing the app; Paddle models remain local to this project.
 os.environ.setdefault("PADDLE_PDX_CACHE_HOME", str(Path(__file__).resolve().parents[2] / "data" / "paddle-cache"))
@@ -36,6 +38,7 @@ def create_app(*, database_path: Path | None = None, provider: ModelProvider | N
     @asynccontextmanager
     async def lifespan(_app):
         store.recover()
+        recover_meetings(store)
         yield
 
     app = FastAPI(
@@ -45,6 +48,7 @@ def create_app(*, database_path: Path | None = None, provider: ModelProvider | N
     )
     app.include_router(build_router(repository, controller, lambda risk: snapshot_for_risk(store, risk)))
     app.include_router(build_review_router(store, workflow, repository, storage))
+    app.include_router(build_workspace_router(store, workflow))
     jury_path = jury_database_path or Path(os.environ.get("JURY_DB_PATH", str(path.parent / "consumer-jury.sqlite3")))
     register_jury_routes(app, database_path=jury_path)
 
