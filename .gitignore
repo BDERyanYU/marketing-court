@@ -22,6 +22,9 @@ frontend/dist/
 /uploads/
 /storage/
 /.pnpm-store/
+/AI Court.zip
+/var/
+/test-results/
 *.db
 *.sqlite
 *.sqlite3
