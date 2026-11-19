@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Icon, { type IconName } from '../components/Icon'
 import { api, post } from '../lib/api'
+import { taskError, taskStage } from '../lib/task-status'
 import { marketName } from '../lib/project-options'
 import type {
   DemoCase,
@@ -20,18 +21,6 @@ import ProjectPage from './Project'
 import MeetingPage from './Meeting'
 
 const STORAGE = 'marketing-court-workspace-v3'
-const stageNames: Record<string, string> = {
-  queued: '等待执行',
-  asset_parsing: '提取素材文字',
-  asset_parsed: '文字提取完成',
-  context_frozen: '项目上下文已保存',
-  claims_extracted: '宣称提取完成',
-  retrieval_completed: '规则检索完成',
-  risk_validated: '风险校验完成',
-  audience_checked: '画像匹配评估完成',
-  rewrite_completed: '改写完成，正在复核',
-  completed: '处理完成',
-}
 function saved(): {
   page?: Page
   projectId?: string
@@ -208,9 +197,10 @@ export default function App() {
       setReviewId(selected || result.reviews[0]?.review_id || '')
       setPage('project')
       setTask(
-        result.tasks.find((t) =>
-          ['running', 'queued', 'failed', 'interrupted'].includes(t.status),
-        ) ?? null,
+        result.tasks.find((t) => ['running', 'queued'].includes(t.status)) ??
+          (result.tasks[0] && ['failed', 'interrupted'].includes(result.tasks[0].status)
+            ? result.tasks[0]
+            : null),
       )
     })
   const openMeeting = (id: string) =>
@@ -408,15 +398,13 @@ export default function App() {
             >
               <div>
                 <strong>
-                  {task.kind === 'rewrite' ? '改写复核' : '素材审核'} ·{' '}
-                  {stageNames[task.stage] ??
-                    (task.stage.startsWith('recheck_') ? '修改稿复核中' : task.stage)}
+                  {task.kind === 'rewrite' ? '改写复核' : '素材审核'} · {taskStage(task.stage)}
                 </strong>
                 <p>
-                  {task.error ??
+                  {taskError(task.error) ??
                     (task.status === 'completed'
                       ? '结果已保存到项目。'
-                      : '进度自动更新，完成后可查看报告。')}
+                      : '进度自动更新；连接短暂中断时会自动重试，最多尝试 3 次。可刷新页面恢复进度。')}
                 </p>
               </div>
               {['failed', 'interrupted'].includes(task.status) ? (
@@ -424,9 +412,10 @@ export default function App() {
                   className="secondary"
                   disabled={Boolean(busy)}
                   onClick={() =>
-                    void action('重试任务', async () =>
-                      setTask(await post<Task>(`/api/tasks/${task.task_id}/retry`)),
-                    )
+                    void action('重试任务', async () => {
+                      setTask(await post<Task>(`/api/tasks/${task.task_id}/retry`))
+                      if (detail) await loadProject(detail.project.project_id)
+                    })
                   }
                 >
                   重试当前任务

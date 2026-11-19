@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import AssetCanvas from '../components/AssetCanvas'
 import { resourceUrl } from '../lib/api'
+import { taskError } from '../lib/task-status'
 import { marketName, categoryName } from '../lib/project-options'
 import type { Context, Detail, Persona, Review } from './types'
 import { Badge, channels, Conclusions, date, PersonaSummary, states } from './common'
@@ -86,11 +87,11 @@ export default function ProjectPage({
         ))}
       </nav>
       {detail.tasks
-        .filter((t) => ['failed', 'interrupted'].includes(t.status))
         .slice(0, 1)
+        .filter((t) => ['failed', 'interrupted'].includes(t.status))
         .map((t) => (
           <p className="notice" key={t.task_id}>
-            上次任务未完成：{t.error}。可以在上方任务进度中重试，或添加新版本。
+            上次任务未完成：{taskError(t.error)} 可以在上方任务进度中重试，无需重新上传。
           </p>
         ))}
       {stage < 2 && (
@@ -390,7 +391,9 @@ export default function ProjectPage({
               <div className="empty">
                 <h3>还没有审核报告</h3>
                 <p>添加素材后，报告会与项目版本一起保存。</p>
-                <button onClick={upload}>提交审核</button>
+                <button onClick={upload} disabled={busy}>
+                  提交审核
+                </button>
               </div>
             )}
           </section>

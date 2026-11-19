@@ -101,6 +101,7 @@ class Store:
             if (mode, model) != (task.mode, task.model):
                 raise HTTPException(409, "请使用创建任务时的模式和模型重试。")
             task.status, task.error = "queued", None
+            task.error_code, task.retryable = None, False
             db.execute("UPDATE review_tasks SET payload=? WHERE id=?", (task.model_dump_json(), identifier))
         return task
 
@@ -111,6 +112,7 @@ class Store:
                 if task.status in ("queued", "running"):
                     task.status = "interrupted"
                     task.error = "服务已重启，已完成步骤保留，请重试继续。"
+                    task.error_code, task.retryable = "service_restarted", True
                     db.execute("UPDATE review_tasks SET payload=? WHERE id=?", (task.model_dump_json(), row["id"]))
 
     def finish(self, task: Task, records):
@@ -118,5 +120,6 @@ class Store:
             for kind, identifier, parent, value in records:
                 self.write(db, kind, identifier, parent, value)
             task.status, task.stage, task.error = "completed", "completed", None
+            task.error_code, task.retryable = None, False
             task.events.append("completed")
             db.execute("UPDATE review_tasks SET payload=? WHERE id=?", (task.model_dump_json(), task.task_id))

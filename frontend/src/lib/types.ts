@@ -101,6 +101,8 @@ export interface Task {
   stage: string
   events: string[]
   error: string | null
+  error_code?: string | null
+  retryable?: boolean
   result_id: string | null
 }
 export interface Rewrite {

@@ -25,6 +25,7 @@ class ReviewWorkflow:
 
     def checkpoint(self, task, stage, **values):
         task.stage, task.status = stage, "running"
+        task.error, task.error_code, task.retryable = None, None, False
         if stage not in task.events:
             task.events.append(stage)
         task.checkpoints.update(values)
@@ -49,6 +50,7 @@ class ReviewWorkflow:
                                       if DEMO_INPUT.claim_quote in text else [])}
                 extraction = ClaimExtraction.model_validate(payload)
             else:
+                self.checkpoint(task, key("extracting_claims"))
                 extraction = self.provider.complete(
                     step="claim_extraction",
                     instruction=("提取广告中的可审核宣称。claim_text 必须逐字复制 original_text 的连续片段，不得改写。"
@@ -86,6 +88,7 @@ class ReviewWorkflow:
                         reason=DEMO_INPUT.reason, source_ids=["G1", "G2"],
                         evidence_gaps=["与整只水杯环保宣称范围匹配的证明材料"])
                 else:
+                    self.checkpoint(task, key("assessing_risks"))
                     assessment = self.provider.complete(step="risk_assessment",
                         instruction=("依据提供的 CMA 监管指引审核该环保宣称。产品证据未提供，不得认定事实已被推翻。"
                                      "必须引用 sources 内的 source_id。仅给风险复核意见，不能批准投放或断言违法。"),
@@ -105,6 +108,7 @@ class ReviewWorkflow:
                     claim_quote=claim.claim_text, anchor_ids=claim.anchor_ids, location_status=claim.location_status))
         fit = task.checkpoints.get(key("audience_fit"))
         if audience.get("personas") and fit is None and self.provider.mode == "live":
+            self.checkpoint(task, key("checking_audience"))
             fit = self.provider.complete(step="audience_fit",
                 instruction="定性评估素材与提供画像的匹配关系，用中文，不虚构受众数据或分数。画像是待验证假设，不替代市场研究。",
                 context={"original_text": text, "audience": audience, "market": project.market}, output=AudienceFit).model_dump()
@@ -154,8 +158,10 @@ class ReviewWorkflow:
             task.status = "failed"
             if isinstance(error, ModelError):
                 task.error = str(error)
+                task.error_code, task.retryable = error.code, error.retryable
             else:
                 task.error = "处理失败，已保留完成步骤，请检查服务状态后重试。"
+                task.error_code, task.retryable = "workflow_error", True
                 logger.error("Workflow failed: %s", type(error).__name__)
             self.store.save_task(task)
 

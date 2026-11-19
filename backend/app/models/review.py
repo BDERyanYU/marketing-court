@@ -159,6 +159,8 @@ class Task(StrictModel):
     stage: str
     events: list[str] = Field(default_factory=list)
     error: str | None = None
+    error_code: str | None = None
+    retryable: bool = False
     result_id: str | None = None
     checkpoints: dict = Field(default_factory=dict)
     created_at: datetime

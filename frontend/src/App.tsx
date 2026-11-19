@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, post } from './lib/api'
+import { taskError, taskStage } from './lib/task-status'
 import type {
   Asset,
   CourtCase,
@@ -17,19 +18,6 @@ import Court from './pages/Court'
 import Icon, { type IconName } from './components/Icon'
 
 const STORAGE = 'marketing-court-session-v1'
-const stages: Record<string, string> = {
-  queued: '等待执行',
-  asset_parsing: '识别图片文字',
-  asset_parsed: '图片解析完成',
-  claims_extracted: '宣称提取完成',
-  retrieval_completed: '规则检索完成',
-  risk_validated: '风险校验完成',
-  rewrite_completed: '改写完成，正在复核',
-  recheck_claims_extracted: '改写宣称提取完成',
-  recheck_retrieval_completed: '改写规则检索完成',
-  recheck_risk_validated: '改写风险校验完成',
-  completed: '处理完成',
-}
 
 function savedSession(): { page?: Page; reviewId?: string; caseId?: string; taskId?: string } {
   try {
@@ -287,14 +275,13 @@ export default function App() {
             >
               <div>
                 <strong>
-                  {task.kind === 'review' ? '素材审核' : '改写复核'} ·{' '}
-                  {stages[task.stage] ?? task.stage}
+                  {task.kind === 'review' ? '素材审核' : '改写复核'} · {taskStage(task.stage)}
                 </strong>
                 <p>
-                  {task.error ??
+                  {taskError(task.error) ??
                     (task.status === 'completed'
                       ? '结果已保存。'
-                      : '处理进度会自动更新，你可以留在此页等待。')}
+                      : '进度自动更新；连接短暂中断时会自动重试，最多尝试 3 次。可刷新页面恢复进度。')}
                 </p>
               </div>
               {['failed', 'interrupted'].includes(task.status) ? (

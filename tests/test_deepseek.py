@@ -57,9 +57,90 @@ def test_deepseek_errors_are_retryable_without_exposing_provider_content(status,
     provider = DeepSeekProvider(
         "test-only-key",
         transport=httpx.MockTransport(lambda _request: httpx.Response(status, json=body)),
+        max_attempts=1,
     )
     with pytest.raises(ModelError) as error:
         complete_prosecution(provider)
+    assert "test-only-key" not in str(error.value)
+
+
+def turn_response():
+    return httpx.Response(200, json={"choices": [{"finish_reason": "stop", "message": {
+        "content": json.dumps(dict(position="maintain", argument="Evidence is required.",
+                                  source_ids=["G1"], responds_to=None, evidence_requested=[]))}}]})
+
+
+@pytest.mark.parametrize("failure", [httpx.ConnectError, httpx.ConnectTimeout,
+    httpx.ReadTimeout, httpx.ReadError, httpx.RemoteProtocolError])
+def test_transient_transport_failure_recovers_with_bounded_backoff(failure, monkeypatch, caplog):
+    delays, calls = [], []
+    monkeypatch.setattr("backend.app.core.model_api.time.sleep", delays.append)
+
+    def answer(request):
+        calls.append(request)
+        assert request.extensions["timeout"]["connect"] == 15
+        assert request.extensions["timeout"]["read"] == 90
+        if len(calls) < 3:
+            raise failure("test-only-key private payload", request=request)
+        return turn_response()
+
+    provider = DeepSeekProvider("test-only-key", transport=httpx.MockTransport(answer))
+    assert complete_prosecution(provider).source_ids == ["G1"]
+    assert len(calls) == 3 and delays == [1, 2]
+    assert len({r.content for r in calls}) == 1
+    assert "test-only-key" not in caplog.text and "private payload" not in caplog.text
+
+
+@pytest.mark.parametrize(("failure", "code"), [
+    (httpx.ReadTimeout, "deepseek_read_timeout"),
+    (httpx.ConnectTimeout, "deepseek_connect_timeout"),
+    (httpx.ConnectError, "deepseek_connection_error"),
+    (httpx.RemoteProtocolError, "deepseek_connection_interrupted"),
+])
+def test_exhausted_transport_failure_has_safe_actionable_reason(failure, code, monkeypatch):
+    calls = []
+    monkeypatch.setattr("backend.app.core.model_api.time.sleep", lambda _: None)
+
+    def answer(request):
+        calls.append(request)
+        raise failure("test-only-key", request=request)
+
+    provider = DeepSeekProvider("test-only-key", transport=httpx.MockTransport(answer))
+    with pytest.raises(ModelError) as error:
+        complete_prosecution(provider)
+    assert len(calls) == 3
+    assert error.value.code == code and error.value.retryable
+    assert "重试" in str(error.value) and "test-only-key" not in str(error.value)
+
+
+@pytest.mark.parametrize("status", [408, 429, 500, 502, 503, 504])
+def test_transient_http_failure_recovers(status, monkeypatch):
+    delays, calls = [], []
+    monkeypatch.setattr("backend.app.core.model_api.time.sleep", delays.append)
+
+    def answer(request):
+        calls.append(request)
+        if len(calls) == 1:
+            return httpx.Response(status, headers={"Retry-After": "2"}, json={"error": "test-only-key"})
+        return turn_response()
+
+    provider = DeepSeekProvider("test-only-key", transport=httpx.MockTransport(answer))
+    assert complete_prosecution(provider).source_ids == ["G1"]
+    assert len(calls) == 2 and delays == [2]
+
+
+@pytest.mark.parametrize("status", [400, 401, 402, 403, 404, 422])
+def test_configuration_or_account_failure_is_not_automatically_retried(status):
+    calls = []
+
+    def answer(request):
+        calls.append(request)
+        return httpx.Response(status, json={"error": "test-only-key"})
+
+    with pytest.raises(ModelError) as error:
+        complete_prosecution(DeepSeekProvider("test-only-key", transport=httpx.MockTransport(answer)))
+    assert len(calls) == 1 and not error.value.retryable
+    assert error.value.code == f"deepseek_http_{status}"
     assert "test-only-key" not in str(error.value)
 
 
