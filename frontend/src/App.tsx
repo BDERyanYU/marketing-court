@@ -311,9 +311,9 @@ export default function App() {
                   setPage('review')
                 })
               }
-              onUpload={(name, file) =>
+              onUpload={(project, file) =>
                 void action('上传素材', async () => {
-                  const p = await post<Project>('/api/projects', { name })
+                  const p = await post<Project>('/api/projects', project)
                   const data = new FormData()
                   data.append('file', file)
                   const a = await api<Asset>(`/api/projects/${p.project_id}/assets`, {

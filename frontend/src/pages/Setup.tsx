@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import type { Health, Project, Review } from '../lib/types'
+import type { Health, Project, ProjectInput, Review } from '../lib/types'
 
 interface Props {
   health: Health | null
@@ -9,7 +9,7 @@ interface Props {
   onProject: (id: string) => void
   onOpen: (id: string) => void
   onDemo: () => void
-  onUpload: (name: string, file: File) => void
+  onUpload: (project: ProjectInput, file: File) => void
 }
 
 export default function Setup({
@@ -23,6 +23,9 @@ export default function Setup({
   onUpload,
 }: Props) {
   const [name, setName] = useState('我的环保广告项目')
+  const [market, setMarket] = useState<ProjectInput['market']>('GB')
+  const [productCategory, setProductCategory] =
+    useState<ProjectInput['product_category']>('reusable_bottle')
   const [file, setFile] = useState<File | null>(null)
   const [fileError, setFileError] = useState('')
   const [dragging, setDragging] = useState(false)
@@ -37,7 +40,7 @@ export default function Setup({
   }
   const submit = (event: FormEvent) => {
     event.preventDefault()
-    if (file) onUpload(name.trim(), file)
+    if (file) onUpload({ name: name.trim(), market, product_category: productCategory }, file)
   }
   return (
     <>
@@ -82,17 +85,34 @@ export default function Setup({
           <div className="field-grid">
             <label>
               目标市场
-              <select disabled value="GB">
+              <select
+                name="market"
+                aria-label="目标市场"
+                value={market}
+                onChange={(e) => setMarket(e.target.value as ProjectInput['market'])}
+                aria-describedby="supported-review-scope"
+              >
                 <option value="GB">英国 / United Kingdom</option>
               </select>
             </label>
             <label>
               商品类别
-              <select disabled value="reusable_bottle">
+              <select
+                name="product_category"
+                aria-label="商品类别"
+                value={productCategory}
+                onChange={(e) =>
+                  setProductCategory(e.target.value as ProjectInput['product_category'])
+                }
+                aria-describedby="supported-review-scope"
+              >
                 <option value="reusable_bottle">日用消费品 · 水杯</option>
               </select>
             </label>
           </div>
+          <p id="supported-review-scope" className="muted small">
+            当前可选范围：英国市场、日用消费品 · 水杯。环保宣称规则已接入，更多市场与品类待扩展。
+          </p>
           <label
             className={`dropzone ${dragging ? 'dragging' : ''}`}
             onDragOver={(e) => {

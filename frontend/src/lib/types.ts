@@ -9,6 +9,11 @@ export interface Project {
   name: string
   market: string
 }
+export interface ProjectInput {
+  name: string
+  market: 'GB'
+  product_category: 'reusable_bottle'
+}
 export interface Asset {
   asset_version_id: string
   project_id: string
