@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tinytroupe"
+version = "0.8.1"
+description = "TinyTroupe source fork for Marketing Court"
+requires-python = ">=3.12"
+license = { file = "LICENSE" }
+dependencies = [
+    "chevron>=0.14,<1",
+    "ipython>=8,<10",
+    "llama-index-core>=0.14,<0.15",
+    "llama-index-embeddings-openai>=0.6,<0.7",
+    "llama-index-readers-web>=0.6,<0.7",
+    "markdown>=3.7,<4",
+    "openai>=1.65,<3",
+    "pandas>=2.2,<4",
+    "pydantic>=2.5,<3",
+    "pypandoc>=1.15,<2",
+    "requests>=2.32,<3",
+    "rich>=13,<15",
+    "scipy>=1.14,<2",
+    "textdistance>=4.6,<5",
+    "tiktoken>=0.8,<1",
+]
+
+[tool.setuptools.packages.find]
+include = ["tinytroupe*"]
+
+[tool.setuptools.package-data]
+tinytroupe = ["config.ini", "**/*.json", "**/*.md", "**/*.mustache"]

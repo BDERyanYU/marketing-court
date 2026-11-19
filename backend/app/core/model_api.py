@@ -73,13 +73,27 @@ class DeepSeekProvider:
                 "content": json.dumps({"step": step, **context}, ensure_ascii=False),
             },
         ]
+        message = self.chat(messages)
+        try:
+            return output.model_validate_json(message["content"])
+        except ValueError:
+            raise ModelError("DeepSeek returned an incomplete or invalid role result.") from None
+
+    def chat(
+        self,
+        messages: list[dict[str, str]],
+        *,
+        temperature: float = 0.3,
+        max_tokens: int | None = None,
+    ) -> dict[str, str]:
+        """Send a JSON-mode conversation using the shared DeepSeek connection settings."""
         request = {
             "model": self.model,
             "messages": messages,
             "response_format": {"type": "json_object"},
             "thinking": {"type": "disabled"},
-            "max_tokens": self._max_tokens,
-            "temperature": 0.3,
+            "max_tokens": self._max_tokens if max_tokens is None else max_tokens,
+            "temperature": temperature,
         }
         try:
             with httpx.Client(
@@ -103,7 +117,7 @@ class DeepSeekProvider:
             content = choice["message"]["content"]
             if choice["finish_reason"] != "stop" or not isinstance(content, str) or not content.strip():
                 raise ValueError
-            return output.model_validate_json(content)
+            return {"role": "assistant", "content": content}
         except (IndexError, KeyError, TypeError, ValueError):
             raise ModelError("DeepSeek returned an incomplete or invalid role result.") from None
 
