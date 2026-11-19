@@ -10,10 +10,12 @@ async function main() {
     executablePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe', headless: true,
   });
   const page = await browser.newPage({ viewport: { width: 1440, height: 810 } });
-  const errors = [], apiRequests = [];
+  const errors = [], apiRequests = [], externalRequests = [];
   page.on('pageerror', error => errors.push(error.message));
   page.on('request', request => {
-    if (/\/(api|health)(\/|$)/.test(new URL(request.url()).pathname)) apiRequests.push(request.url());
+    const url = new URL(request.url());
+    if (/\/(api|health)(\/|$)/.test(url.pathname)) apiRequests.push(request.url());
+    if (/^https?:$/.test(url.protocol) && url.origin !== new URL(app).origin) externalRequests.push(request.url());
   });
   try {
     await page.goto(app + '/');
@@ -24,7 +26,19 @@ async function main() {
     await expect(page.locator('.nav a')).toHaveCount(1);
     await expect(page.locator('.eyebrow')).toHaveCount(0);
     if (await page.locator('.hero-cta').evaluate(node => getComputedStyle(node).backgroundColor) !== 'rgb(56, 59, 64)') throw Error('Entry button is not dark gray');
-    if (await page.locator('.card').count() !== 6) throw Error('Missing miniature pages');
+    if (await page.locator('.card').count() !== 6) throw Error('Missing advertising examples');
+    const expectedImages = ['domestic-abuse', 'social-ethics', 'shock-imagery', 'religion', 'animal-ethics', 'sexual-innuendo'];
+    await expect.poll(() => page.locator('.ad-image').evaluateAll(images =>
+      images.length === 6 && images.every(image => image.complete && image.naturalWidth > 0)
+    )).toBe(true);
+    const imagePaths = await page.locator('.ad-image').evaluateAll(images => images.map(image => new URL(image.currentSrc).pathname));
+    if (JSON.stringify(imagePaths) !== JSON.stringify(expectedImages.map(name => '/landing-ads/' + name + '.webp'))) throw Error('Incorrect supplied advertising images');
+    if (await page.locator('.ad-image').evaluateAll(images => images.some(image => getComputedStyle(image).objectFit !== 'contain' || !image.alt))) throw Error('Images are cropped or lack descriptions');
+    if (await page.locator('.ad-image').evaluateAll(images => images.some(image => {
+      const box = image.getBoundingClientRect();
+      return Math.abs(box.width / box.height - image.naturalWidth / image.naturalHeight) > 0.01;
+    }))) throw Error('Card proportions do not match the source images');
+    if ((await page.locator('.cards').textContent()).trim()) throw Error('Old decorative copy covers the advertising');
     const loaded = await page.evaluate(() => [
       document.fonts.check('400 20px Inter'), document.fonts.check('400 20px Newsreader'),
       document.fonts.check('italic 400 20px Newsreader'), document.fonts.check('500 12px "IBM Plex Mono"'),
@@ -48,18 +62,20 @@ async function main() {
     await page.mouse.move(960, box.y + box.height / 2, { steps: 12 });
     await page.mouse.up();
     if (beforeDrag === await page.locator('.card.home').evaluate(node => getComputedStyle(node).transform)) throw Error('Reverse dragging did not rebuild the card');
-    const percentages = new Set();
-    for (let i = 0; i < 50; i++) {
+    const topics = new Set();
+    for (let i = 0; i < 100; i++) {
       await belt.focus(); await page.keyboard.press('ArrowLeft');
-      percentages.add(await page.locator('.badge-percent').textContent());
+      topics.add(await page.locator('.badge-topic').textContent());
     }
-    if (percentages.size < 5) throw Error('Counter does not follow the six cards');
+    if (topics.size !== 6) throw Error('Example indicator does not follow all six cards');
+    if (externalRequests.length) throw Error('Welcome page requested external resources: ' + externalRequests.join(', '));
     for (const [width, height] of [[1703,955], [890,902], [740,955], [390,844], [320,568]]) {
       await page.setViewportSize({ width, height });
       await page.waitForTimeout(150);
       if (await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1)) throw Error('Horizontal overflow at ' + width);
       const cta = await page.locator('.hero-cta').boundingBox(), badge = await page.locator('.badge').boundingBox();
       if (cta.y + cta.height > badge.y) throw Error('Hero overlaps scanner counter at ' + width);
+      await page.evaluate(() => document.activeElement.blur());
       await page.screenshot({ path: path.join(out, `welcome-${width}.png`), fullPage: true });
     }
     await page.setViewportSize({ width: 1440, height: 810 });
@@ -85,6 +101,9 @@ async function main() {
     });
     await offline.goto(app);
     await offline.evaluate(() => document.fonts.ready);
+    await expect.poll(() => offline.locator('.ad-image').evaluateAll(images =>
+      images.length === 6 && images.every(image => image.complete && image.naturalWidth > 0)
+    )).toBe(true);
     await expect(offline.getByRole('button', { name: 'Play motion', exact: true })).toBeVisible();
     const still = await offline.locator('.card.home').evaluate(node => getComputedStyle(node).transform);
     await offline.waitForTimeout(250);
@@ -95,7 +114,7 @@ async function main() {
     await offline.screenshot({ path: path.join(out, 'offline-reduced-motion.png') });
     await offline.close();
     if (errors.length) throw Error(errors.join('\n'));
-    console.log(JSON.stringify({ welcome: 'no backend calls, embedded fonts, 6 cards, centered scanner, pause, keyboard and drag passed', counterPercentages: [...percentages], routes: '/ -> Open the court -> /review -> /jury -> /review; version aliases passed', responsiveWidths: [1703,1440,890,740,390,320], offlineAndReducedMotion: 'passed', pageErrors: errors }));
+    console.log(JSON.stringify({ welcome: 'no backend calls or external requests; embedded fonts, 6 supplied images, centered gray scanner, pause, keyboard and drag passed', exampleTopics: [...topics], routes: '/ -> Open the court -> /review -> /jury -> /review; version aliases passed', responsiveWidths: [1703,1440,890,740,390,320], offlineAndReducedMotion: 'all images loaded, passed', pageErrors: errors }));
   } finally { await browser.close(); }
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });

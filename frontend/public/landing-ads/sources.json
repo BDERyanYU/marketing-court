@@ -1,0 +1,59 @@
+{
+  "note": "Images extracted from user-supplied saved HTML pages and their local asset folders. Topic grouping is editorial, not an audit finding. Original images remain unaltered; WebP encoding only.",
+  "images": [
+    {
+      "file": "domestic-abuse.webp",
+      "topic": "家庭暴力公益广告",
+      "source_document": "家庭暴力公益广告.html",
+      "source_image_label": "Sammie Covington Design - FearFree",
+      "width": 800,
+      "height": 1200,
+      "source_sha256": "d02973eac355ffdea58c3586cef95fff52d7c2056d07a9c89be2a43310fb05cd"
+    },
+    {
+      "file": "social-ethics.webp",
+      "topic": "社会伦理争议",
+      "source_document": "社会伦理争议.html",
+      "source_image_label": "Fashion’s Biggest Faux Pas: 5 Campaigns That Cross The Line | Outlook India",
+      "width": 619,
+      "height": 495,
+      "source_sha256": "db4a01d3fe81981da71b5599658f702e260346e60637b63ff7d972ddcce08a43"
+    },
+    {
+      "file": "shock-imagery.webp",
+      "topic": "视觉冲击广告",
+      "source_document": "视觉冲击广告.html",
+      "source_image_label": "Roach girl • Ads of the World™ | Part of The Clio Network",
+      "width": 1075,
+      "height": 860,
+      "source_sha256": "4a986714648b50020cbc0b8649efc1de8eaa32be318c0a11701abd0922ef66f1"
+    },
+    {
+      "file": "religion.webp",
+      "topic": "宗教争议广告",
+      "source_document": "宗教争议广告.html",
+      "source_image_label": "**Скандальна реклама моди: від провокацій до шедеврів**",
+      "width": 1200,
+      "height": 850,
+      "source_sha256": "c5d610ef7e71a88e10c18d1d784a43122233b64a2fc7f5ee11a314bf9050bfe3"
+    },
+    {
+      "file": "animal-ethics.webp",
+      "topic": "伦理争议广告",
+      "source_document": "伦理争议广告.html",
+      "source_image_label": "Does Meat Make You Flaccid? PETA Thinks So | LBBOnline",
+      "width": 550,
+      "height": 780,
+      "source_sha256": "8911bc204fd62c56bb45d0376c06c334898a8810d47a1ba13089846623a4001f"
+    },
+    {
+      "file": "sexual-innuendo.webp",
+      "topic": "性暗示广告",
+      "source_document": "性暗示广告.html",
+      "source_image_label": "La colère d'un mannequin humilié par Burger King | 7sur7.be",
+      "width": 1024,
+      "height": 975,
+      "source_sha256": "b5215880e01746495ec873c047dd9dfe8bf87a473a8db162dc23ba83cc8a9353"
+    }
+  ]
+}
