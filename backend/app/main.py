@@ -5,6 +5,7 @@ import os
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, FileResponse
 
+from .AgentDiscussing.api import build_discussion_routes
 from .core.config import database_path_from_env, provider_from_env
 from .core.llm import ModelError, ModelProvider
 from .api.review import build_review_router
@@ -39,8 +40,10 @@ def create_app(*, database_path: Path | None = None, provider: ModelProvider | N
         description="营销素材审核、改写复核与消费者模拟。投放审批由人工负责。",
         lifespan=lifespan,
     )
-    app.include_router(build_review_router(store, workflow, storage))
+    discussion_router, delete_discussions = build_discussion_routes(store, provider, path)
+    app.include_router(build_review_router(store, workflow, storage, delete_discussions=delete_discussions))
     app.include_router(build_workspace_router(store, workflow))
+    app.include_router(discussion_router)
     jury_path = jury_database_path or Path(os.environ.get("JURY_DB_PATH", str(path.parent / "consumer-jury.sqlite3")))
     register_jury_routes(app, database_path=jury_path)
 

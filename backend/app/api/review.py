@@ -2,6 +2,7 @@
 
 import hashlib
 import logging
+from collections.abc import Callable
 from pathlib import Path
 
 from fastapi import APIRouter, BackgroundTasks, Form, HTTPException, UploadFile
@@ -17,7 +18,9 @@ from ..services.workspace import upsert
 from ..models.workspace import ReportAddendum
 
 
-def build_review_router(store, workflow, storage: Path):
+def build_review_router(
+    store, workflow, storage: Path, *, delete_discussions: Callable[[str], bool] | None = None,
+):
     router = APIRouter(prefix="/api", tags=["Review"])
 
     @router.get("/projects", response_model=list[Project])
@@ -45,7 +48,7 @@ def build_review_router(store, workflow, storage: Path):
     @router.delete("/projects/{project_id}")
     def delete_project(project_id: str):
         filenames = store.delete_project(project_id)
-        cleanup_pending = False
+        cleanup_pending = delete_discussions is not None and not delete_discussions(project_id)
         root = storage.resolve()
         for filename in filenames:
             path = (root / filename).resolve()

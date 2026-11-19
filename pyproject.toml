@@ -20,6 +20,7 @@ dependencies = [
 dev = ["pytest>=8.4,<10", "httpx2>=2,<3"]
 
 [project.optional-dependencies]
+roundtable = ["moot"]
 ocr = ["paddleocr>=3,<4", "paddlepaddle>=3,<4"]
 ocr-portable = ["rapidocr==3.10.0", "onnxruntime==1.23.2"]
 
@@ -27,6 +28,7 @@ ocr-portable = ["rapidocr==3.10.0", "onnxruntime==1.23.2"]
 package = false
 
 [tool.uv.sources]
+moot = { git = "https://github.com/sinaKGT/Moot", rev = "51af49ecbaae8842e5cb21ce7f93418bfac64c4c" }
 tinytroupe = { path = "vendor/tinytroupe", editable = true }
 
 [tool.pytest.ini_options]
