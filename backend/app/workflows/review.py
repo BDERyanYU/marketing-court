@@ -1,6 +1,7 @@
 """Checkpointed review and bounded rewrite workflow."""
 
 import logging
+import hashlib
 from pathlib import Path
 
 from ..core.llm import ModelError
@@ -11,6 +12,7 @@ from ..models.review import (AssetVersion, ClaimExtraction, Project, Review, Rew
 from ..services.claims import map_claim
 from ..services.retrieval import RULE_VERSION, retrieve
 from ..services.rewrite import remove_claim
+from ..services.greenlint import case_data, evaluate
 
 logger = logging.getLogger(__name__)
 
@@ -132,9 +134,18 @@ class ReviewWorkflow:
         project = self.store.get("project", original.project_id, Project)
         revised = remove_claim(original.original_text, risk.claim_quote)
         self.checkpoint(task, "rewrite_completed")
-        asset = source_asset.model_copy(update={"asset_version_id": new_id("copy"), "kind": "copy",
+        asset = source_asset.model_copy(update={"asset_version_id": new_id("copy"), "kind": "text" if source_asset.kind == "text" else "copy",
             "text": revised, "parent_asset_version_id": source_asset.asset_version_id, "created_at": now()})
-        reviewed = self.analyze(revised, original.anchors, asset, project, task, "recheck_")
+        if source_asset.kind == "text":
+            asset.sha256 = hashlib.sha256(revised.encode()).hexdigest()
+        if original.example:
+            case = case_data(original.example.case_id)
+            if case is None:
+                raise ModelError("未找到原案例数据，无法复核。")
+            reviewed = evaluate(case, revised, review_id=new_id("review"), asset_id=asset.asset_version_id)
+            self.checkpoint(task, "recheck_risk_validated")
+        else:
+            reviewed = self.analyze(revised, original.anchors, asset, project, task, "recheck_")
         rewrite = Rewrite(rewrite_id=new_id("rewrite"), source_review_id=original.review_id,
             source_risk_id=risk_id, source_asset_version_id=source_asset.asset_version_id,
             asset_version_id=asset.asset_version_id, review_id=reviewed.review_id,

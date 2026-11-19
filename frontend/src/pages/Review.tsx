@@ -50,7 +50,10 @@ export default function Review({
         <div>
           <h1>每项风险，都能追溯。</h1>
           <p className="intro">
-            英国 · 日用消费品 · 环保宣称{asset.kind === 'copy' ? ' · 改写文案版本' : ''}
+            {review?.example
+              ? `${review.example.market === 'GB' ? '英国' : '欧盟'} · ${review.example.category} · ${review.example.title}`
+              : '英国 · 日用消费品 · 环保宣称'}
+            {asset.parent_asset_version_id ? ' · 改写文案版本' : ''}
           </p>
         </div>
         {review && (
@@ -67,7 +70,11 @@ export default function Review({
       {review?.mode === 'demo' && (
         <div className="notice">
           <Icon name="file" size={17} />
-          <span>预设案例：文字、坐标与审核结果由人工准备；庭审发言按服务当前模式生成。</span>
+          <span>
+            {review.example
+              ? 'GreenLint v1.2 预设文案：规则匹配在本地重现，不调用实时审核；未提供广告原图。'
+              : '预设案例：文字、坐标与审核结果由人工准备；庭审发言按服务当前模式生成。'}
+          </span>
         </div>
       )}
       {review && (
@@ -95,10 +102,16 @@ export default function Review({
           <div className="panel-title">
             <div className="title-with-icon">
               <Icon name="scan" size={20} />
-              <h2>{asset.kind === 'copy' ? '关联原图' : '原始素材'}</h2>
+              <h2>
+                {asset.kind === 'text'
+                  ? '广告文案'
+                  : asset.kind === 'copy'
+                    ? '关联原图'
+                    : '原始素材'}
+              </h2>
             </div>
             <span className="small-tag">
-              {asset.width} × {asset.height}
+              {asset.kind === 'text' ? '文案案例' : `${asset.width} × ${asset.height}`}
             </span>
           </div>
           <AssetCanvas
@@ -109,7 +122,7 @@ export default function Review({
           />
           <div className="asset-caption">
             <span>{asset.original_filename}</span>
-            <span>点击标注查看风险</span>
+            <span>{asset.kind === 'text' ? '未提供原始图片' : '点击标注查看风险'}</span>
           </div>
           {asset.kind === 'copy' && (
             <div className="notice">
@@ -152,7 +165,11 @@ export default function Review({
                   </span>
                   <span>
                     风险 {String(index + 1).padStart(2, '0')} ·{' '}
-                    {risk.location_status === 'located' ? '已定位原文' : '定位待确认'}
+                    {asset.kind === 'text'
+                      ? '文案片段'
+                      : risk.location_status === 'located'
+                        ? '已定位原文'
+                        : '定位待确认'}
                   </span>
                 </button>
                 <blockquote>{risk.claim_quote}</blockquote>
@@ -161,6 +178,11 @@ export default function Review({
                     ? '需要证据支持'
                     : '信息不足，需人工核实'}
                 </div>
+                {risk.demo_rule_ids?.length ? (
+                  <p className="demo-rule-note">
+                    包内规则匹配：{risk.demo_rule_ids.join(' / ')}（演示规则编号）
+                  </p>
+                ) : null}
                 <p>{risk.reason}</p>
                 <div className="evidence-gap">
                   <strong>待补材料</strong>
@@ -178,10 +200,35 @@ export default function Review({
                           {s.source_id} · {s.title} ↗
                         </a>
                         <q>{s.excerpt}</q>
-                        <small>监管指引 · 核查 {s.checked_at}</small>
+                        <small>
+                          监管指引 · 核查 {s.checked_at}
+                          {review.example ? '；与包内 LR 规则分开引用' : ''}
+                        </small>
                       </div>
                     ))}
                 </details>
+                {risk.demo_rule_ids?.length ? (
+                  <details className="package-rule-note">
+                    <summary>包内演示规则说明</summary>
+                    <p>
+                      以下条款说明随演示包导入，未在本次独立核验。英国案例的法律依据以上方 CMA
+                      引用为准；EU 条款不能直接用于英国。
+                    </p>
+                    {review.example_rules
+                      ?.filter((rule) => risk.demo_rule_ids?.includes(rule.rule_id))
+                      .map((rule) => (
+                        <div className="source" key={rule.rule_id}>
+                          <strong>
+                            {rule.rule_id} /{' '}
+                            {rule.market === 'Both' ? '包内标记 UK / EU' : rule.market}
+                          </strong>
+                          <p>{rule.citation}</p>
+                          <q>{rule.excerpt}</q>
+                          <p>{rule.explanation}</p>
+                        </div>
+                      ))}
+                  </details>
+                ) : null}
                 <div className="risk-actions">
                   <button
                     className="secondary"
@@ -203,8 +250,23 @@ export default function Review({
           })}
           {review && review.risks.length === 0 && (
             <div className="panel no-risk">
-              <h3>未识别到本主题待核查项</h3>
-              <p>检查仅覆盖当前环保文字规则，不表示素材已获得投放批准。</p>
+              <h3>
+                {review.example?.polarity === 'positive'
+                  ? '正面对照：未发现明显风险'
+                  : '未识别到本主题待核查项'}
+              </h3>
+              <p>
+                {review.example
+                  ? `仅表示当前文案在 GreenLint 包内${review.example.market === 'EU' ? '欧盟' : '英国'}演示规则下未命中；产品属性与证明未核验，不代表已获投放批准。`
+                  : '检查仅覆盖当前环保文字规则，不表示素材已获得投放批准。'}
+              </p>
+              {review.example?.polarity === 'positive' && (
+                <ul className="positive-reasons">
+                  <li>明确写出再生材料及 100% 比例，而非笼统的整体环保承诺。</li>
+                  <li>提供 FSC 编号线索，但证书真实性和适用范围仍待核验。</li>
+                  <li>“darker than conventional” 比较的是纸张颜色，没有被误判为环保性能比较。</li>
+                </ul>
+              )}
             </div>
           )}
         </section>
@@ -237,7 +299,10 @@ export default function Review({
             </button>
           </div>
           <p className="muted small">
-            建议仅为文案预览，原图未修改。其他风险与产品真实性仍需人工确认。
+            {asset.kind === 'text'
+              ? '建议仅删除选中风险句，其余表述未获批准。'
+              : '建议仅为文案预览，原图未修改。'}
+            其他风险与产品真实性仍需人工确认。
           </p>
         </section>
       ))}

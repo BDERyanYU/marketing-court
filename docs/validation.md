@@ -28,7 +28,15 @@ $env:BROWSER_OUTPUT_DIR='test-results/design-v2'
 node tests/browser-smoke.cjs
 ```
 
-## 真实供应商验证
+## GreenLint 案例接入（2026-11-20）
+
+新增 Apple Watch 英国负例（1 项）、Eco Dog Bed 英国负例（5 项）、Copier Paper 欧盟正例（0 项）。保留原始文案和市场，新增文本标记选择、包内规则说明、原审核与改写分别保存，以及原有庭审、恢复和导出能力。
+
+新增后端用例通过，六项原始风险均验证四次控辩和一次裁判；原 43 项测试通过，真实 OCR 测试默认跳过。TypeScript 与 Vite 构建通过。隔离演示服务中 Chrome 验证三例入口、结果、文本选择、改写、庭审恢复、JSON 下载及 320/390/890/1440px 布局；原水杯完整浏览器流程和第一版入口也通过。截图位于 `test-results/greenlint-browser/`。
+
+案例审核与改写使用固定本地规则，无实时模型费用；这次验证不计入供应商调用验收。原日常后端已重启加载新接口，实时模式仍使用 `deepseek-flash`。
+
+## 真实供应商验证记录
 
 2026-11-19 使用用户确认的 `deepseek-flash` 完成真实端到端演练：上传示例图、PaddleOCR 坐标提取、宣称提取、风险审核、一次改写复核、四次控辩发言与独立裁判。报告保存在被 Git 排除的 `test-results/live-report.json`。API 密钥仅保存在本机被排除的 `.env`，未提交。
 

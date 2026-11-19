@@ -16,6 +16,8 @@ class ProjectRequest(StrictModel):
 
 
 class Project(ProjectRequest):
+    market: Literal["GB", "EU"] = "GB"
+    product_category: Literal["reusable_bottle", "electronics", "pet_supplies", "office_supplies"] = "reusable_bottle"
     project_id: str
     created_at: datetime
 
@@ -23,7 +25,7 @@ class Project(ProjectRequest):
 class AssetVersion(StrictModel):
     asset_version_id: str
     project_id: str
-    kind: Literal["image", "copy"] = "image"
+    kind: Literal["image", "copy", "text"] = "image"
     original_filename: str
     sha256: str
     width: int
@@ -93,6 +95,26 @@ class RiskItem(RiskAssessment):
     location_status: Literal["located", "needs_confirmation"]
     workflow_status: Literal["open"] = "open"
     product_evidence_status: Literal["not_supplied"] = "not_supplied"
+    demo_rule_ids: list[str] = Field(default_factory=list)
+
+
+class DemoCaseInfo(StrictModel):
+    case_id: str
+    title: str
+    market: Literal["GB", "EU"]
+    category: str
+    polarity: Literal["negative", "positive"]
+    expected_risks: int
+    description: str
+    provenance: str
+
+
+class DemoRule(StrictModel):
+    rule_id: str
+    market: str
+    citation: str
+    excerpt: str
+    explanation: str
 
 
 class Review(StrictModel):
@@ -109,6 +131,8 @@ class Review(StrictModel):
     rule_pack_version: str
     limitations: list[str]
     created_at: datetime
+    example: DemoCaseInfo | None = None
+    example_rules: list[DemoRule] = Field(default_factory=list)
 
 
 class Task(StrictModel):

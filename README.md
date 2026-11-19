@@ -8,6 +8,8 @@
 
 界面第二版采用深蓝导航、浅色证据工作台和控辩时间线。第一版源码保存在 `frontend/src/v1/`，可通过 [第一版预览](http://127.0.0.1:5173/?ui=v1) 打开；新版侧栏与手机页脚也提供入口。Git 标签 `ui-v1` 保留改版前完整代码。设计与版本说明见 [界面设计](docs/interface-design.md)。
 
+首页新增 GreenLint v1.2 的两个负面文案案例（英国 Apple Watch、Eco Dog Bed）和一个正面案例（欧盟 Copier Paper），展示包内规则的 1 / 5 / 0 项风险结果。支持文案选择、规则说明、改写复核、庭审与报告导出；原水杯案例保留。案例数据为预设演示，不扩大实时审核覆盖范围，详见 [案例来源与边界](docs/greenlint-cases.md)。
+
 ## 启动固定案例演示
 
 需要 Python 3.12+、[uv](https://docs.astral.sh/uv/)、Node.js 20+ 与 pnpm。在仓库根目录运行：

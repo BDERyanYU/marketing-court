@@ -1,6 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, post } from './lib/api'
-import type { Asset, CourtCase, Health, Page, Project, Review, Rewrite, Task } from './lib/types'
+import type {
+  Asset,
+  CourtCase,
+  DemoCase,
+  Health,
+  Page,
+  Project,
+  Review,
+  Rewrite,
+  Task,
+} from './lib/types'
 import Setup from './pages/Setup'
 import ReviewPage from './pages/Review'
 import Court from './pages/Court'
@@ -34,6 +44,7 @@ export default function App() {
   const [page, setPage] = useState<Page>(initial.current.page ?? 'setup')
   const [health, setHealth] = useState<Health | null>(null)
   const [projects, setProjects] = useState<Project[]>([])
+  const [examples, setExamples] = useState<DemoCase[]>([])
   const [history, setHistory] = useState<Review[]>([])
   const [review, setReview] = useState<Review | null>(null)
   const [asset, setAsset] = useState<Asset | null>(null)
@@ -85,6 +96,7 @@ export default function App() {
         if (cancelled) return
         setHealth(status)
         await refreshProjects()
+        setExamples(await api<DemoCase[]>('/api/demo-cases'))
         if (initial.current.reviewId) await loadReview(initial.current.reviewId)
         if (initial.current.caseId)
           setCourt(await api<CourtCase>(`/api/cases/${initial.current.caseId}`))
@@ -309,6 +321,7 @@ export default function App() {
             <Setup
               health={health}
               projects={projects}
+              examples={examples}
               history={history}
               busy={locked}
               onProject={(id) =>
@@ -317,6 +330,17 @@ export default function App() {
                 )
               }
               onOpen={(id) => void chooseReview(id)}
+              onExample={(id) =>
+                void action('打开文案案例', async () => {
+                  const r = await post<Review>(`/api/demo-cases/${id}`)
+                  await loadReview(r.review_id)
+                  await refreshProjects()
+                  setTask(null)
+                  setCourt(null)
+                  setAuto(false)
+                  setPage('review')
+                })
+              }
               onDemo={() =>
                 void action('打开预设案例', async () => {
                   const r = await post<Review>('/api/demo')

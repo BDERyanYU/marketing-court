@@ -59,5 +59,17 @@ class DemoProvider:
         output: type[Output],
     ) -> Output:
         if context["risk_id"] != DEMO_INPUT.risk_id:
-            raise ModelError("Demo mode only has scripted responses for the sample risk.")
+            from ..services.greenlint import scripted_input
+            snapshot = scripted_input(context["risk_id"])
+            if snapshot is None:
+                raise ModelError("Demo mode only has scripted responses for predefined example risks.")
+            quote = snapshot.claim_quote
+            responses = {
+                CourtStep.PROSECUTION_1: dict(position="maintain", argument=f"G1 提醒泛化或绝对化宣称可能误导。本案的‘{quote}’需要明确适用范围，并依据 G2 提供相应证明。", source_ids=["G1", "G2"], responds_to=None, evidence_requested=[]),
+                CourtStep.DEFENSE_1: dict(position="challenge", argument="现有材料只是文案摘录，不能仅因缺少附件就断定产品属性不实。应先核对商品页完整限定、适用部件和可提供的证明。", source_ids=["G2"], responds_to=CourtStep.PROSECUTION_1, evidence_requested=[]),
+                CourtStep.PROSECUTION_2: dict(position="request_evidence", argument="同意不能推定属性虚假，但当前案卷没有证明可覆盖消费者理解的宣称范围。应继续保留待核查项，补齐资料后再判断。", source_ids=["G1", "G2"], responds_to=CourtStep.DEFENSE_1, evidence_requested=["产品属性依据及宣称范围说明"]),
+                CourtStep.DEFENSE_2: dict(position="narrow", argument="建议先删除当前待补证句，保留其他产品介绍；其余环保宣称仍须分别检查，不应由单句改写推定整篇合规。", source_ids=["G2"], responds_to=CourtStep.PROSECUTION_2, evidence_requested=["与实际材料或碳核算范围一致的证明"]),
+                CourtStep.JUDGMENT: dict(disposition="insufficient_evidence", reason="当前仅有预设文案，无法核实属性、认证或排放依据。保留待补证意见，不认定品牌违法；补齐材料后再复核。", source_ids=["G1", "G2"], evidence_requested=["完整广告上下文、适用范围与可核验的产品证明"]),
+            }
+            return output.model_validate(responses[step])
         return output.model_validate(RESPONSES[step])

@@ -104,6 +104,7 @@ async function main() {
     await uploadPage.route('**/api/**', async route => {
       const request = route.request()
       const endpoint = new URL(request.url()).pathname
+      if (endpoint === '/api/demo-cases') return route.fulfill({ json: [] })
       if (endpoint === '/api/projects') {
         if (request.method() === 'GET') return route.fulfill({ json: [] })
         projectInput = request.postDataJSON()

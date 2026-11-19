@@ -36,7 +36,9 @@ class CourtController:
         if snapshot is None:
             raise CourtNotFound("No completed review input for this risk ID.")
         if self.provider.mode == "demo" and snapshot != DEMO_INPUT:
-            raise CourtConflict("Demo mode only supports the demo-eco-bottle risk.")
+            from ..services.greenlint import scripted_input
+            if snapshot != scripted_input(risk_id):
+                raise CourtConflict("Demo mode only supports the predefined example snapshots.")
         return self.repository.create_case(snapshot, self.provider.mode, self.provider.model)
 
     def get_case(self, case_id: UUID) -> CourtCase:

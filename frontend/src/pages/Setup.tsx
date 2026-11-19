@@ -1,27 +1,31 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import Icon from '../components/Icon'
 import BottleArt from '../components/BottleArt'
-import type { Health, Project, ProjectInput, Review } from '../lib/types'
+import type { DemoCase, Health, Project, ProjectInput, Review } from '../lib/types'
 
 interface Props {
   health: Health | null
   projects: Project[]
+  examples: DemoCase[]
   history: Review[]
   busy: boolean
   onProject: (id: string) => void
   onOpen: (id: string) => void
   onDemo: () => void
+  onExample: (id: string) => void
   onUpload: (project: ProjectInput, file: File) => void
 }
 
 export default function Setup({
   health,
   projects,
+  examples,
   history,
   busy,
   onProject,
   onOpen,
   onDemo,
+  onExample,
   onUpload,
 }: Props) {
   const [name, setName] = useState('我的环保广告项目')
@@ -243,6 +247,51 @@ export default function Setup({
           </section>
         </div>
       </div>
+      {examples.length > 0 && (
+        <section id="greenlint-cases" className="example-library" aria-label="GreenLint 案例库">
+          <div className="section-heading">
+            <div>
+              <h2>同一套方法，看见风险与边界</h2>
+              <p className="intro">GreenLint v1.2 文案案例：两个负面示例，一个正面对照。</p>
+            </div>
+            <span className="small-tag">预设文案</span>
+          </div>
+          <div className="example-grid">
+            {examples.map((example) => (
+              <article className={`example-card ${example.polarity}`} key={example.case_id}>
+                <div className="example-meta">
+                  <span className={`severity ${example.polarity === 'positive' ? 'low' : 'high'}`}>
+                    {example.polarity === 'positive' ? '正面案例' : '负面案例'}
+                  </span>
+                  <span>
+                    {example.market === 'GB' ? '英国' : '欧盟'} / {example.category}
+                  </span>
+                </div>
+                <h3>{example.title}</h3>
+                <p>{example.description}</p>
+                <div className="example-open">
+                  <span>
+                    {example.expected_risks
+                      ? `${example.expected_risks} 处高风险`
+                      : '包内规则未发现明显风险'}
+                  </span>
+                  <button
+                    className="secondary"
+                    disabled={busy || !health}
+                    onClick={() => onExample(example.case_id)}
+                    aria-label={`打开${example.title}`}
+                  >
+                    查看案例 <Icon name="arrow" size={15} />
+                  </button>
+                </div>
+              </article>
+            ))}
+          </div>
+          <p className="example-disclaimer">
+            示例判定不代表品牌违法或产品获准投放。文案来自演示包，未提供原图与商品页链接。
+          </p>
+        </section>
+      )}
       {projects.length > 0 && (
         <section className="panel history-panel">
           <div className="panel-title">

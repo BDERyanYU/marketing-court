@@ -9,6 +9,7 @@ from ..core.store import new_id, now
 from ..models.court import CourtInput, PolicyCitation
 from ..models.review import AssetVersion, Project, ProjectRequest, Review, Rewrite, Task
 from ..services.demo import install_demo
+from ..services.greenlint import install_example, list_examples
 from ..services.parsing import MAX_UPLOAD_BYTES, inspect_image
 
 
@@ -48,6 +49,8 @@ def build_review_router(store, workflow, courts, storage: Path):
     @router.get("/assets/{asset_id}/image")
     def image(asset_id: str):
         item = store.get("asset", asset_id, AssetVersion)
+        if item.kind == "text" or not item.storage_name:
+            raise HTTPException(404, "此案例仅包含文案，没有原始图片。")
         path = storage / item.storage_name
         if not path.is_file():
             raise HTTPException(404, "原图文件缺失。")
@@ -77,7 +80,10 @@ def build_review_router(store, workflow, courts, storage: Path):
 
     @router.post("/tasks/{task_id}/retry", response_model=Task, status_code=202, response_model_exclude={"checkpoints"})
     def retry(task_id: str, background: BackgroundTasks):
-        task = store.retry(task_id, workflow.provider.mode, workflow.provider.model)
+        previous = store.task(task_id)
+        fixed_example = previous.kind == "rewrite" and previous.model == "greenlint-fixture-v1.2"
+        task = store.retry(task_id, previous.mode if fixed_example else workflow.provider.mode,
+                           previous.model if fixed_example else workflow.provider.model)
         background.add_task(workflow.run, task.task_id)
         return task
 
@@ -91,9 +97,11 @@ def build_review_router(store, workflow, courts, storage: Path):
         review = store.get("review", review_id, Review)
         if not any(r.risk_id == risk_id for r in review.risks):
             raise HTTPException(404, "风险不属于此审核版本。")
-        if review.mode != workflow.provider.mode or review.model != workflow.provider.model:
+        if review.example is None and (review.mode != workflow.provider.mode or review.model != workflow.provider.model):
             raise HTTPException(409, "请使用原审核的模式与模型进行改写复核；预设案例请在固定演示模式使用。")
-        task, fresh = store.start_task("rewrite", review_id + "/" + risk_id, workflow.provider.mode, workflow.provider.model)
+        task, fresh = store.start_task("rewrite", review_id + "/" + risk_id,
+                                      review.mode if review.example else workflow.provider.mode,
+                                      review.model if review.example else workflow.provider.model)
         if fresh:
             background.add_task(workflow.run, task.task_id)
         return task
@@ -110,6 +118,14 @@ def build_review_router(store, workflow, courts, storage: Path):
     @router.post("/demo", response_model=Review)
     def demo():
         return install_demo(store, storage)
+
+    @router.get("/demo-cases")
+    def demo_cases():
+        return list_examples()
+
+    @router.post("/demo-cases/{case_id}", response_model=Review)
+    def open_demo_case(case_id: str):
+        return install_example(store, case_id)
 
     @router.get("/reviews/{review_id}/report")
     def report(review_id: str):
@@ -138,7 +154,7 @@ def snapshot_for_risk(store, risk_id: str) -> CourtInput:
         citations = [PolicyCitation(source_id=s.source_id, excerpt=s.excerpt, url=s.url)
                      for s in review.sources if s.source_id in risk.source_ids]
         return CourtInput(risk_id=risk_id, review_id=review.review_id, asset_version_id=review.asset_version_id,
-            original_text=review.original_text, claim_quote=risk.claim_quote, market="GB", assessment=risk.assessment,
+            original_text=review.original_text, claim_quote=risk.claim_quote, market=store.get("project", review.project_id, Project).market, assessment=risk.assessment,
             reason=risk.reason, rule_pack_version=review.rule_pack_version, citations=citations,
             product_evidence_status="not_supplied")
     raise HTTPException(404, "未找到该风险的审核记录。")

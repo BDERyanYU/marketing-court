@@ -15,11 +15,63 @@ export default function AssetCanvas({
 }) {
   const container = useRef<HTMLDivElement>(null)
   useEffect(() => {
+    if (asset.kind === 'text') {
+      const element = container.current
+      const selected = element?.querySelector<HTMLElement>('[data-selected="true"]')
+      if (element && selected) {
+        const frame = element.getBoundingClientRect()
+        const bounds = selected.getBoundingClientRect()
+        if (bounds.top < frame.top || bounds.bottom > frame.bottom) {
+          element.scrollTop += bounds.top - frame.top - 20
+        }
+      }
+      return
+    }
     container.current?.querySelector('[data-selected="true"]')?.scrollIntoView({
       behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
       block: 'nearest',
     })
-  }, [selectedRisk])
+  }, [selectedRisk, asset.kind])
+  if (asset.kind === 'text') {
+    const text = review?.original_text ?? asset.text ?? ''
+    const ranges = (review?.risks ?? [])
+      .map((risk) => ({ risk, start: text.indexOf(risk.claim_quote) }))
+      .filter((item) => item.start >= 0)
+      .sort((a, b) => a.start - b.start)
+    const pieces = []
+    let cursor = 0
+    for (const { risk, start } of ranges) {
+      if (start < cursor) continue
+      pieces.push(text.slice(cursor, start))
+      pieces.push(
+        <button
+          key={risk.risk_id}
+          className={`text-risk ${risk.risk_id === selectedRisk ? 'selected' : ''}`}
+          data-selected={risk.risk_id === selectedRisk}
+          aria-label={`查看风险：${risk.claim_quote}`}
+          aria-pressed={risk.risk_id === selectedRisk}
+          onClick={() => onSelect(risk.risk_id)}
+        >
+          {risk.claim_quote}
+        </button>,
+      )
+      cursor = start + risk.claim_quote.length
+    }
+    pieces.push(text.slice(cursor))
+    return (
+      <div className="text-asset" ref={container}>
+        <p className="text-asset-label">
+          {asset.parent_asset_version_id ? '改写文案版本' : '案例原始文案'}
+        </p>
+        <div className="text-asset-content" lang="en">
+          {pieces}
+        </div>
+        <p className="text-asset-note">
+          {review?.risks.length ? '点击标记句，查看对应风险与依据。' : '未标出待核查句。'}
+        </p>
+      </div>
+    )
+  }
   return (
     <div className="asset-scroll" ref={container}>
       <div className="asset-canvas" style={{ aspectRatio: `${asset.width}/${asset.height}` }}>

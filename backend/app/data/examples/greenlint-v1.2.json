@@ -1,0 +1,40 @@
+{
+  "version": "greenlint-v1.2",
+  "source_archive": "GreenLint_演示包_v1.2.zip",
+  "archive_sha256": "f505a7b61f75c768fca440c9997f823edbd2ca9b7a06ae422701e86d83833691",
+  "sample_source": "GreenLint_演示包/03_开发/ui.html · SAMPLES",
+  "rules_sha256": "f296dd6c4eef76f3c8af0dd41d0112e571f90c535f98bc86e16fe5ee943bf5af",
+  "cases": [
+    {
+      "case_id": "apple-watch",
+      "title": "Apple Watch 碳中和宣称",
+      "market": "GB",
+      "category": "3C 配件",
+      "polarity": "negative",
+      "expected_risks": 1,
+      "description": "Carbon Neutral 缺少核算范围和依据，需要核实实际减排与抵消的关系。",
+      "original_text": "Apple Watch Series 10 GPS + Cellular 46 mm Smartwatch with Slate Titanium Case with Slate Milanese Loop - M/L. Fitness Tracker, ECG App, Always-On Retina Display, Carbon Neutral — WHY APPLE WATCH SERIES 10: Bigger display with up to 30 per cent more screen area. A thinner, lighter and more comfortable design."
+    },
+    {
+      "case_id": "eco-dog-bed",
+      "title": "Eco Dog Bed 环保系列宣称",
+      "market": "GB",
+      "category": "其他",
+      "polarity": "negative",
+      "expected_risks": 5,
+      "description": "泛化环保、再生纤维与环保系列表述缺少比例、适用范围和入选标准。",
+      "original_text": "Eco Dog Pet Bed Grey - Recycled Plastic Bottle Yarn Wipe-Clean 5 Sizes — Grey Eco Dog Bed Made with Recycled Yarn — Premium Features: Recycled Plastic Bottle Yarn - Eco-friendly and durable — Sustainable Materials - Planet-friendly choice — Eco Range - Part of sustainable collection"
+    },
+    {
+      "case_id": "copier-paper",
+      "title": "Copier Paper 再生纸文案",
+      "market": "EU",
+      "category": "办公用品",
+      "polarity": "positive",
+      "expected_risks": 0,
+      "description": "比例、材料和认证编号使表述更具体；颜色深浅比较不等于环保比较。",
+      "original_text": "Amazon Basics Copier Paper, 100% Recycled, Natural White, A4, 80 g/m², 2500 Sheets (5 Rivers) — NATURAL WHITE COLOR: Made from 100% recycled fibres with a natural, slightly broken white tone. The paper is not bright white and therefore looks slightly darker than conventional white copy paper (ISO brightness 80, CIE whiteness 85). — Box contents: 2,500 sheets of A4 copy paper in 5 packs of 500 sheets, made from 100% recycled material in natural/off-white — FSC certified copy paper (FSC N004130). Made from materials sourced from responsibly managed forests, recycled materials and/or wood from other controlled sources."
+    }
+  ],
+  "rules_hash_format": "JSON canonical: sorted keys, compact separators, UTF-8, ensure_ascii=False"
+}

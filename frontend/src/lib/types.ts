@@ -18,7 +18,9 @@ export interface Asset {
   asset_version_id: string
   project_id: string
   image_url: string
-  kind: 'image' | 'copy'
+  kind: 'image' | 'copy' | 'text'
+  text?: string | null
+  parent_asset_version_id?: string | null
   original_filename: string
   width: number
   height: number
@@ -48,6 +50,17 @@ export interface Risk {
   evidence_gaps: string[]
   anchor_ids: string[]
   location_status: string
+  demo_rule_ids?: string[]
+}
+export interface DemoCase {
+  case_id: string
+  title: string
+  market: 'GB' | 'EU'
+  category: string
+  polarity: 'negative' | 'positive'
+  expected_risks: number
+  description: string
+  provenance: string
 }
 export interface Review {
   review_id: string
@@ -62,6 +75,14 @@ export interface Review {
   limitations: string[]
   created_at: string
   rule_pack_version: string
+  example?: DemoCase | null
+  example_rules?: {
+    rule_id: string
+    market: string
+    citation: string
+    excerpt: string
+    explanation: string
+  }[]
 }
 export interface Task {
   task_id: string
@@ -105,6 +126,7 @@ export interface CourtCase {
   status: string
   next_step: string | null
   snapshot: {
+    market: string
     risk_id: string
     claim_quote: string
     original_text: string
