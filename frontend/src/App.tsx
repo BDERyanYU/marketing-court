@@ -64,6 +64,17 @@ export default function App() {
   const [task, setTask] = useState<Task | null>(null)
   const [busy, setBusy] = useState('')
   const [error, setError] = useState('')
+  const [renamingProject, setRenamingProject] = useState<Project | null>(null)
+  const [renameName, setRenameName] = useState('')
+  const [renameError, setRenameError] = useState('')
+  const [renameBusy, setRenameBusy] = useState(false)
+  const renameDialog = useRef<HTMLDialogElement>(null)
+  const [progressDismissed, setProgressDismissed] = useState(false)
+  useEffect(() => {
+    if (renamingProject) renameDialog.current?.showModal()
+    else renameDialog.current?.close()
+  }, [renamingProject])
+  useEffect(() => setProgressDismissed(false), [task?.task_id, task?.status])
   const [deletingProject, setDeletingProject] = useState<Project | null>(null)
   const [deleteError, setDeleteError] = useState('')
   const [deleteBusy, setDeleteBusy] = useState(false)
@@ -206,6 +217,31 @@ export default function App() {
   }, [task?.task_id, task?.status, review?.review_id, loadReview, refreshProjects])
   const pending = Boolean(task && ['queued', 'running'].includes(task.status))
   const locked = Boolean(busy) || pending
+  const showProgress =
+    page !== 'persona' &&
+    (pending ||
+      busy === '上传素材' ||
+      busy === '启动审核' ||
+      busy === '生成改写' ||
+      busy === '恢复任务')
+  const saveProjectName = async () => {
+    if (!renamingProject || renameBusy) return
+    setRenameBusy(true)
+    setRenameError('')
+    try {
+      const updated = await api<Project>(`/api/projects/${renamingProject.project_id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: renameName.trim() }),
+      })
+      setProjects((items) => items.map((p) => (p.project_id === updated.project_id ? updated : p)))
+      setRenamingProject(null)
+    } catch (e) {
+      setRenameError(e instanceof Error ? e.message : '重命名失败，请重试。')
+    } finally {
+      setRenameBusy(false)
+    }
+  }
   const visibleHealth = page === 'persona' ? personaHealth : health
   const selectedProject = projects.find((p) => p.project_id === projectId)
   const openProject = (id: string) => {
@@ -316,6 +352,19 @@ export default function App() {
                   <span className="nav-indicator" />
                 </button>
                 <button
+                  className="project-delete project-rename"
+                  aria-label={`重命名项目：${project.name}`}
+                  title="重命名项目"
+                  disabled={Boolean(busy) || renameBusy}
+                  onClick={() => {
+                    setRenamingProject(project)
+                    setRenameName(project.name)
+                    setRenameError('')
+                  }}
+                >
+                  <Icon name="edit" size={16} />
+                </button>
+                <button
                   className="project-delete"
                   aria-label={`删除项目：${project.name}`}
                   title="删除项目"
@@ -335,11 +384,6 @@ export default function App() {
             )}
           </div>
         </nav>
-        <div className="workspace-note">
-          <Icon name="shield" size={24} />
-          <strong>让判断回到证据</strong>
-          <p>定位广告宣称，追溯规则依据，对照改写与复核结果。</p>
-        </div>
         <div className="sidebar-bottom">
           <div>
             <span className={`status-dot ${health ? 'online' : ''}`} />
@@ -407,7 +451,7 @@ export default function App() {
                   ×
                 </button>
               ) : (
-                <span className="spinner" />
+                <button onClick={() => setProgressDismissed(false)}>查看进度</button>
               )}
             </div>
           )}
@@ -514,6 +558,82 @@ export default function App() {
           <span className="footer-wordmark">Marketing Court</span>
         </footer>
       </div>
+      {showProgress && !progressDismissed && (
+        <div className="review-progress-overlay">
+          <section
+            className="review-progress-card"
+            role="status"
+            aria-live="polite"
+            aria-label="审核进度"
+          >
+            <span className="spinner" />
+            <h2>{task?.kind === 'rewrite' ? '正在改写与复核' : '正在审核素材'}</h2>
+            <p>{pending && task ? taskStage(task.stage) : busy}</p>
+            <div
+              className="review-progress-track"
+              role="progressbar"
+              aria-label="审核处理中"
+              aria-valuetext={pending && task ? taskStage(task.stage) : busy}
+            >
+              <span />
+            </div>
+            <p className="review-progress-help">
+              进度按实际处理阶段更新，完成后自动展示结果。已完成步骤会保存，刷新后可恢复。
+            </p>
+            <button className="secondary" onClick={() => setProgressDismissed(true)}>
+              收起进度，后台继续
+            </button>
+          </section>
+        </div>
+      )}
+      <dialog
+        ref={renameDialog}
+        className="delete-project-dialog"
+        aria-labelledby="rename-title"
+        onCancel={(event) => {
+          event.preventDefault()
+          if (!renameBusy) setRenamingProject(null)
+        }}
+      >
+        <form
+          onSubmit={(event) => {
+            event.preventDefault()
+            void saveProjectName()
+          }}
+        >
+          <h2 id="rename-title">重命名项目</h2>
+          <label className="field-label" htmlFor="project-rename-name">
+            项目名称
+          </label>
+          <input
+            id="project-rename-name"
+            autoFocus
+            required
+            maxLength={100}
+            value={renameName}
+            disabled={renameBusy}
+            onChange={(event) => setRenameName(event.target.value)}
+          />
+          {renameError && (
+            <p className="delete-dialog-error" role="alert">
+              {renameError}
+            </p>
+          )}
+          <div className="delete-dialog-actions">
+            <button
+              type="button"
+              className="secondary"
+              disabled={renameBusy}
+              onClick={() => setRenamingProject(null)}
+            >
+              取消
+            </button>
+            <button className="primary" disabled={renameBusy || !renameName.trim()}>
+              {renameBusy ? '正在保存…' : '保存名称'}
+            </button>
+          </div>
+        </form>
+      </dialog>
       <dialog
         ref={deleteDialog}
         className="delete-project-dialog"

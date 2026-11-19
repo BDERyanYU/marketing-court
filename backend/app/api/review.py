@@ -8,7 +8,7 @@ from fastapi import APIRouter, BackgroundTasks, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, JSONResponse
 
 from ..core.store import new_id, now
-from ..models.review import AssetVersion, Project, ProjectRequest, Review, Rewrite, Task
+from ..models.review import AssetVersion, Project, ProjectRequest, ProjectRename, Review, Rewrite, Task
 from ..services.demo import install_demo
 from ..services.greenlint import install_example, list_examples
 from ..services.parsing import MAX_UPLOAD_BYTES, inspect_image
@@ -28,6 +28,18 @@ def build_review_router(store, workflow, storage: Path):
     def create_project(request: ProjectRequest):
         project = Project(**request.model_dump(), project_id=new_id("project"), created_at=now())
         store.add("project", project.project_id, project.project_id, project)
+        return project
+
+    @router.patch("/projects/{project_id}", response_model=Project)
+    def rename_project(project_id: str, request: ProjectRename):
+        with store.connection() as db:
+            db.execute("BEGIN IMMEDIATE")
+            row = db.execute("SELECT payload FROM records WHERE kind='project' AND id=?", (project_id,)).fetchone()
+            if row is None:
+                raise HTTPException(404, "项目不存在或已删除。")
+            project = Project.model_validate_json(row["payload"])
+            project.name = request.name
+            db.execute("UPDATE records SET payload=? WHERE kind='project' AND id=?", (project.model_dump_json(), project_id))
         return project
 
     @router.delete("/projects/{project_id}")

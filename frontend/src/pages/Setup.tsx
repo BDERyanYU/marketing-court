@@ -75,10 +75,6 @@ export default function Setup({
           <h1>让每一句宣称，都有据可循。</h1>
           <p className="intro">从广告素材到规则依据，再到改写复核。让营销判断多一份证据。</p>
         </div>
-        <span className="page-scope">
-          <Icon name="shield" size={17} />
-          英国环保宣称审核
-        </span>
       </div>
       <ol className="workflow-strip" aria-label="审核流程">
         <li className="current">

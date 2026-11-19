@@ -1,9 +1,9 @@
 """Typed contracts for the local review workflow."""
 
 from datetime import datetime
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import Field
+from pydantic import Field, StringConstraints
 
 from .common import Identifier, StrictModel
 
@@ -23,6 +23,10 @@ class ProjectRequest(StrictModel):
 class Project(ProjectRequest):
     project_id: str
     created_at: datetime
+
+
+class ProjectRename(StrictModel):
+    name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)]
 
 
 class AssetVersion(StrictModel):

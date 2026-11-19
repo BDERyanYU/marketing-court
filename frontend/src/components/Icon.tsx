@@ -16,8 +16,10 @@ export type IconName =
   | 'spark'
   | 'back'
   | 'trash'
+  | 'edit'
 
 const paths: Record<IconName, ReactNode> = {
+  edit: <path d="m16 3 5 5-12 12-6 1 1-6L16 3Zm-2 2 5 5" />,
   trash: <path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7" />,
   scales: (
     <>
