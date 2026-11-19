@@ -49,8 +49,11 @@ async function main() {
     await (await download).saveAs(path.resolve('test-results/report.json'))
     const report = JSON.parse(fs.readFileSync('test-results/report.json', 'utf8'))
     if (!report.court_cases.some(c => c.status === 'completed') || !report.rewrites.length) throw new Error('Incomplete exported report')
+    await page.getByRole('link', { name: '消费者模拟（独立页面）' }).click()
+    await page.waitForURL('**/jury')
+    if (!(await page.content()).includes('水杯样例')) throw new Error('Existing consumer simulator page is unavailable')
     if (errors.length) throw new Error(errors.join('\n'))
-    console.log('Browser flow passed: fixture, overlay, rewrite, court, refresh, mobile, JSON export.')
+    console.log('Browser flow passed: fixture, overlay, rewrite, court, refresh, mobile, JSON export, existing jury page.')
   } finally { await browser.close() }
 }
 main().catch(e => { console.error(e); process.exitCode = 1 })

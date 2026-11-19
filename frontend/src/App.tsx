@@ -220,6 +220,9 @@ export default function App() {
             </button>
           ))}
         </nav>
+        <a className="text-button" style={{ marginTop: 20 }} href="/jury">
+          消费者模拟（独立页面） ↗
+        </a>
         <div className="sidebar-bottom">
           <span className={`status-dot ${health ? 'online' : ''}`} />
           {health ? '本地服务已连接' : '连接本地服务中'}

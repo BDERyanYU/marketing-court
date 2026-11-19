@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 import os
 
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import JSONResponse, FileResponse
 
 from .api.court import build_router
 from .core.config import database_path_from_env, provider_from_env
@@ -15,14 +15,16 @@ from .api.review import build_review_router, snapshot_for_risk
 from .core.store import Store
 from .services.ocr import PaddleOCRService
 from .workflows.review import ReviewWorkflow
+from .jury.main import register_jury_routes
 
 # uvicorn loads .env before importing the app; Paddle models remain local to this project.
 os.environ.setdefault("PADDLE_PDX_CACHE_HOME", str(Path(__file__).resolve().parents[2] / "data" / "paddle-cache"))
 
 
 def create_app(*, database_path: Path | None = None, provider: ModelProvider | None = None,
-               storage_path: Path | None = None, ocr=None) -> FastAPI:
-    path = database_path or database_path_from_env()
+               storage_path: Path | None = None, ocr=None,
+               court_database_path: Path | None = None, jury_database_path: Path | None = None) -> FastAPI:
+    path = database_path or court_database_path or database_path_from_env()
     repository = CourtRepository(path)
     store = Store(path)
     storage = storage_path or Path(os.environ.get("STORAGE_DIR", str(path.parent / "uploads")))
@@ -43,10 +45,12 @@ def create_app(*, database_path: Path | None = None, provider: ModelProvider | N
     )
     app.include_router(build_router(repository, controller, lambda risk: snapshot_for_risk(store, risk)))
     app.include_router(build_review_router(store, workflow, repository, storage))
+    jury_path = jury_database_path or Path(os.environ.get("JURY_DB_PATH", str(path.parent / "consumer-jury.sqlite3")))
+    register_jury_routes(app, database_path=jury_path)
 
     @app.get("/", include_in_schema=False)
     def docs():
-        return RedirectResponse("/docs")
+        return FileResponse(Path(__file__).with_name("index.html"), media_type="text/html")
 
     @app.get("/health", tags=["Service"])
     def health():
