@@ -1,5 +1,7 @@
 # AI Marketing Court
 
+当前版本：**V2.1**，Git 标签 [`ui-v2.1`](https://github.com/BDERyanYU/marketing-court/tree/ui-v2.1)。版本说明见 [更新记录](CHANGELOG.md)。
+
 当前整合版默认采用**第二版素材审核界面**，合入朋友分支的 TinyTroupe 原生画像派生、营销理论文件和消费者 A/B 并行评价。模拟法庭功能已移除。第三版圆桌工作区保留在 `?ui=v3`，第一版审核布局保留在 `?ui=v1`。
 
 完整能力：同一项目图片/文案/联合审核、PaddleOCR 文字坐标、DeepSeek 风险审核、英国 CMA 有限环保规则、改写与一次复核、独立版本、进度恢复、JSON 导出，以及调研报告驱动的消费者模拟。其他市场未接入规则时仅提取文字和宣称。
@@ -22,7 +24,7 @@ pnpm install --frozen-lockfile
 pnpm dev --host 127.0.0.1
 ```
 
-打开 [第二版审核](http://127.0.0.1:5173/) 或 [数字人像测试](http://127.0.0.1:5173/jury)，两者共用侧栏和工作区样式。Windows 启动脚本位于 `scripts/`。固定模式支持四个预设案例，不能审核任意新素材。
+打开 [第二版审核](http://127.0.0.1:5173/) 或 [数字人像测试](http://127.0.0.1:5173/jury)，两者共用侧栏和工作区样式。Windows 启动脚本位于 `scripts/`。审核固定模式支持四个预设案例，数字人像测试提供水杯与复印纸样例；固定模式不能审核任意新素材。
 
 ## 实时模型与画像
 
@@ -34,7 +36,7 @@ DeepSeek 连接中断、超时、限流和临时服务故障最多尝试三次�
 
 ## 数据与验证
 
-SQLite 默认在 `data/marketing_court.sqlite3`，消费者模拟使用独立数据库，上传文件和 Paddle 模型均在本机；密钥、数据库和运行环境不提交代码仓库。预览版使用独立数据副本，`main` 等用户验收后再合并。
+SQLite 默认在 `data/marketing_court.sqlite3`，消费者模拟使用独立数据库，上传文件和 Paddle 模型均在本机；密钥、数据库和运行环境不提交代码仓库。V2.1 已经用户验收并合并到 `main`；预览工作区仍使用独立数据副本。
 
 ```powershell
 .venv/Scripts/python.exe -m pytest -q
