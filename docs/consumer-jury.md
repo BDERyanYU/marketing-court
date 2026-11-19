@@ -28,7 +28,14 @@ MARKETING_COURT_MODE=live DEEPSEEK_API_KEY_FILE="/absolute/path/to/deepseek-key.
 
 ## 营销理论接入
 
-设置 `JURY_THEORY_SKILL_FILE=/absolute/path/to/SKILL.md` 指向团队交付的 Markdown 文件，重启服务后生效。加载器把 Skill 的正文与报告一起交给原版工厂的 `sampling_space_description`，并放进用于生成单个人物的 `context`。报告与 Skill 进入工厂的输入，系统提示词由原版构造。面板记录 Skill 文件名和内容版本摘要。
+仓库自带经过水杯样例验证的[消费者画像派生理论 Skill](../skills/persona-derivation/SKILL.md)。在项目根目录运行以下命令即可带上这份 Skill 启动，并在营销模拟页加载水杯样例。
+
+```sh
+JURY_THEORY_SKILL_FILE="$PWD/skills/persona-derivation/SKILL.md" \
+  .venv/bin/python -m marketing_court
+```
+
+新的 Skill 可以各放在一个 `skills/<名称>/SKILL.md` 中。将 `JURY_THEORY_SKILL_FILE` 指向要用的文件，重启服务后生效。加载器把 Skill 的正文与报告一起交给原版工厂的 `sampling_space_description`，并放进用于生成单个人物的 `context`。系统提示词由原版工厂构造，面板记录 Skill 文件名和内容版本摘要。
 
 团队 Skill 可以写适用场景、营销理论如何判断值得分析的差异，以及标注派生假设的方法。文件读取的是 Markdown 正文。未配置 Skill 时，工厂直接根据报告和用户可选补充的画像派生。
 
