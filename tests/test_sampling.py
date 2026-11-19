@@ -1,8 +1,10 @@
 from collections import Counter
 from itertools import product
 
+import pytest
 from fastapi.testclient import TestClient
 
+from backend.app.jury.demo import DemoProvider
 from backend.app.jury.main import create_app
 
 
@@ -30,7 +32,7 @@ def test_default_panel_applies_tinytroupe_joint_quotas_and_saves_the_plan(tmp_pa
     database = tmp_path / "sampling.db"
     with TestClient(create_app(database_path=database)) as client:
         _, base = sample_report(client)
-        response = client.post("/api/jury/panels", json={**base, "member_count": 3})
+        response = client.post("/api/jury/panels", json={"report_id": base["report_id"], "member_count": 3})
         panel = response.raise_for_status().json()
         derivation = panel["tinytroupe_plan"]
         assert derivation["source_commit"].startswith("7ce8be3")
@@ -42,14 +44,32 @@ def test_default_panel_applies_tinytroupe_joint_quotas_and_saves_the_plan(tmp_pa
         }
         assert sorted(counts.values()) == [1, 2]
         assert len({member["member_id"] for member in panel["members"]}) == 3
+        assert panel["base_persona"] is None
+        assert panel["theories"] == []
+        for member in panel["members"]:
+            specification = member["specification"]
+            assert specification["type"] == "TinyPerson"
+            assert specification["persona"]["personality"]["big_five"]
+            assert specification["persona"]["behaviors"]["routines"]
+            assert "persona_prompt" not in member
 
     with TestClient(create_app(database_path=database)) as client:
         assert client.get("/api/jury/panels/" + panel["panel_id"]).raise_for_status().json() == panel
 
 
 def test_full_sampling_keeps_all_crossed_choices_and_feeds_blind_voting(tmp_path, monkeypatch):
+    class RecordingDemo(DemoProvider):
+        def __init__(self):
+            self.reactions = []
+
+        def complete(self, *, step, instruction, context, output):
+            if step == "jury_reaction":
+                self.reactions.append(context["member"])
+            return super().complete(step=step, instruction=instruction, context=context, output=output)
+
     monkeypatch.setenv("JURY_MODE", "demo")
-    app = create_app(database_path=tmp_path / "sampling.db")
+    provider = RecordingDemo()
+    app = create_app(database_path=tmp_path / "sampling.db", provider=provider)
     with TestClient(app) as client:
         sample, base = sample_report(client)
         panel = panel_for(client, base, mode="full", seed=19)
@@ -73,6 +93,13 @@ def test_full_sampling_keeps_all_crossed_choices_and_feeds_blind_voting(tmp_path
         assert comparison["next_index"] is None
         assert [pair["member_id"] for pair in comparison["pairs"]] == [m["member_id"] for m in panel["members"]]
         assert sum(comparison["vote_counts"]["A"].values()) == sum(comparison["vote_counts"]["B"].values()) == 9
+        for index, member in enumerate(panel["members"]):
+            left, right = provider.reactions[2 * index:2 * index + 2]
+            assert left == right
+            assert left["sampled_conditions"] == [
+                {"name": "接触渠道", "kind": "exposure", "value": member["sampled_values"]["接触渠道"]},
+                {"name": "证据关注度", "kind": "trait", "value": member["sampled_values"]["证据关注度"]},
+            ]
 
 
 def test_random_sampling_repeats_fixed_choices_with_a_seed(tmp_path, monkeypatch):
@@ -88,14 +115,13 @@ def test_random_sampling_repeats_fixed_choices_with_a_seed(tmp_path, monkeypatch
         assert len({tuple(sorted(values.items())) for values in selections}) == 4
 
 
-def test_upstream_expansion_keeps_quantities_and_copies_each_member():
-    from random import Random
-
-    from backend.app.jury.vendor.tinytroupe_sampling import flatten_sampling_plan
-
-    combined = {"channel": "metro display", "proof_attention": "high"}
-    plan = [{"sampled_values": combined, "quantity": 2}]
-    members = flatten_sampling_plan(plan, Random(0))
-    assert members == [combined, combined]
-    members[0]["channel"] = "mobile feed"
-    assert members[1] == combined == {"channel": "metro display", "proof_attention": "high"}
+@pytest.mark.parametrize("member_count", [1, 6])
+def test_user_controls_the_native_panel_size(tmp_path, member_count):
+    app = create_app(database_path=tmp_path / "sampling.db", provider=DemoProvider())
+    with TestClient(app) as client:
+        _, base = sample_report(client)
+        panel = client.post("/api/jury/panels", json={
+            "report_id": base["report_id"], "member_count": member_count,
+        }).raise_for_status().json()
+    assert len(panel["members"]) == member_count
+    assert sum(group["quantity"] for group in panel["tinytroupe_plan"]["sample_plan"]) == member_count

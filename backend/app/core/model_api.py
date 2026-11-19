@@ -85,16 +85,18 @@ class DeepSeekProvider:
         *,
         temperature: float = 0.3,
         max_tokens: int | None = None,
+        json_mode: bool = True,
     ) -> dict[str, str]:
-        """Send a JSON-mode conversation using the shared DeepSeek connection settings."""
+        """Send a conversation using the shared DeepSeek connection settings."""
         request = {
             "model": self.model,
             "messages": messages,
-            "response_format": {"type": "json_object"},
             "thinking": {"type": "disabled"},
             "max_tokens": self._max_tokens if max_tokens is None else max_tokens,
             "temperature": temperature,
         }
+        if json_mode:
+            request["response_format"] = {"type": "json_object"}
         try:
             with httpx.Client(
                 timeout=httpx.Timeout(45, connect=10),

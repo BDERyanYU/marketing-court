@@ -1,7 +1,7 @@
 from typing import Annotated, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
+from pydantic import BaseModel, ConfigDict, Field, JsonValue, StringConstraints, field_validator, model_validator
 
 from ..core.model_api import RunMode
 
@@ -47,6 +47,10 @@ class Report(StrictModel):
     personas: list[Persona]
 
 
+class StoredReport(Report):
+    source_text: str | None = None
+
+
 class SamplingDimension(StrictModel):
     name: DimensionLabel
     kind: Literal["trait", "exposure"]
@@ -75,42 +79,24 @@ class SamplingRequest(StrictModel):
     space: SamplingSpace | None = None
 
 
-class TinyTroupeSpace(SamplingSpace):
-    sampling_space_description: Detail
-
-
-class SampleQuota(StrictModel):
-    id: int = Field(ge=1, strict=True)
-    subpopulation_description: Brief
-    sampled_values: dict[DimensionLabel, DimensionLabel]
-    quantity: int = Field(ge=1, le=5, strict=True)
-
-
-class SamplePlan(StrictModel):
-    sample_plan: list[SampleQuota] = Field(min_length=1, max_length=5)
-
-
-class TinyTroupePlan(SamplePlan):
+class TinyTroupePlan(StrictModel):
     source_commit: str
-    sampling_space: TinyTroupeSpace
+    sampling_space: dict[str, JsonValue]
+    sample_plan: list[dict[str, JsonValue]]
 
 
 class PanelRequest(StrictModel):
     report_id: UUID
     persona_id: UUID | None = None
     manual_persona: Detail | None = None
-    member_count: int = Field(default=3, ge=2, le=5)
+    member_count: int = Field(default=3, ge=1, strict=True)
     sampling: SamplingRequest | None = None
 
     @model_validator(mode="after")
     def validate_choice(self):
-        if (self.persona_id is None) == (self.manual_persona is None):
-            raise ValueError("Choose one extracted persona or supply one manual persona.")
+        if self.persona_id is not None and self.manual_persona is not None:
+            raise ValueError("Choose at most one extracted or manually supplied persona.")
         return self
-
-
-class TheorySelection(StrictModel):
-    theory_ids: list[Brief] = Field(min_length=1, max_length=3)
 
 
 class TheoryReference(StrictModel):
@@ -120,17 +106,39 @@ class TheoryReference(StrictModel):
     version: str
 
 
-class MemberProfile(StrictModel):
+class LegacyMember(StrictModel):
+    """Older saved panels retain the profile used for their original A/B reactions."""
+
     situation: Detail
     persona_prompt: Detail
     assumptions: list[Detail] = Field(min_length=1, max_length=5)
-
-
-class Member(MemberProfile):
     member_id: UUID
     name: Brief
     theory_ids: list[Brief] = Field(min_length=1, max_length=3)
     sampled_values: dict[str, str] = Field(default_factory=dict)
+
+
+class TinyPersonSpecification(StrictModel):
+    type: Literal["TinyPerson"]
+    persona: dict[str, JsonValue]
+
+    @field_validator("persona")
+    @classmethod
+    def require_name(cls, value: dict) -> dict:
+        name = value.get("name")
+        if not isinstance(name, str) or not name.strip():
+            raise ValueError("TinyPerson must have a name.")
+        return value
+
+
+class PanelSeat(StrictModel):
+    member_id: UUID
+    specification: TinyPersonSpecification
+    sampled_values: dict[str, JsonValue] = Field(default_factory=dict)
+
+    @property
+    def name(self) -> str:
+        return str(self.specification.persona["name"])
 
 
 class Panel(StrictModel):
@@ -138,9 +146,9 @@ class Panel(StrictModel):
     report_id: UUID
     mode: RunMode
     model: str
-    base_persona: Persona
+    base_persona: Persona | None
     theories: list[TheoryReference]
-    members: list[Member]
+    members: list[PanelSeat | LegacyMember]
     sampling: SamplingRequest | None = None
     tinytroupe_plan: TinyTroupePlan | None = None
 

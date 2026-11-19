@@ -6,7 +6,7 @@ from ..core.model_api import ModelProvider
 
 from . import demo
 from .aggregate import comparison_view
-from .models import Comparison, ComparisonRequest, ComparisonView, Panel, PanelRequest, Persona, Report, Trait
+from .models import Comparison, ComparisonRequest, ComparisonView, Panel, PanelRequest, Persona, Report, StoredReport, Trait
 from .planner import derive_panel, extract_personas
 from .repository import JuryRepository
 from .sampling import SamplingError
@@ -40,11 +40,11 @@ class JuryService:
         if self.provider.mode == "demo" and text != demo.REPORT:
             raise JuryError("演示模式使用预置报告。运行真实模式可分析自己的报告。")
         report = extract_personas(self.provider, filename, text)
-        self.repo.create("report", report.report_id, report)
+        self.repo.create("report", report.report_id, StoredReport(**report.model_dump(), source_text=text))
         return report
 
-    def get_report(self, report_id: UUID) -> Report:
-        report = self.repo.get("report", report_id, Report)
+    def get_report(self, report_id: UUID) -> StoredReport:
+        report = self.repo.get("report", report_id, StoredReport)
         if report is None:
             raise JuryError("找不到已上传的报告。", 404)
         return report
@@ -52,6 +52,7 @@ class JuryService:
     def create_panel(self, request: PanelRequest) -> Panel:
         report = self.get_report(request.report_id)
         self._check_model(report)
+        persona = None
         if request.manual_persona is not None:
             if self.provider.mode == "demo":
                 raise JuryError("演示模式使用样例中已提取的画像。")
@@ -59,13 +60,16 @@ class JuryService:
                 persona_id=uuid4(), name="用户确认画像",
                 traits=[Trait(attribute="用户填写", value=request.manual_persona, status="user_supplied")],
             )
-        else:
+        elif request.persona_id is not None:
             persona = next((p for p in report.personas if p.persona_id == request.persona_id), None)
             if persona is None:
                 raise JuryError("所选画像不属于这份报告。", 404)
+        if report.source_text is None and persona is None:
+            raise JuryError("这份旧报告只有已提取的画像。请选一个画像或重新上传报告。", 422)
         try:
             panel = derive_panel(
                 self.provider, self.catalog, report.report_id, persona, request.member_count, request.sampling,
+                report_text=report.source_text,
             )
         except SamplingError as error:
             raise JuryError(str(error), 422) from None

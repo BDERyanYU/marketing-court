@@ -1,5 +1,8 @@
+import json
+import sqlite3
 from io import BytesIO
 from pathlib import Path
+from uuid import uuid4
 
 from docx import Document
 from fastapi.testclient import TestClient
@@ -7,6 +10,8 @@ from pypdf import PdfWriter
 from pypdf.generic import DecodedStreamObject, DictionaryObject, NameObject
 import pytest
 
+from backend.app.core.model_api import ModelError
+from backend.app.jury.demo import DemoProvider, _factory_arguments
 from backend.app.jury.main import create_app
 from backend.app.jury.parsing import read_report
 
@@ -16,19 +21,23 @@ BEFORE = "100% Eco-Friendly. Meet the Everyday Bottle."
 AFTER = "Meet the Everyday Bottle."
 
 
-class RecordingProvider:
+class RecordingProvider(DemoProvider):
     mode = "live"
     model = "test-jury-model"
 
     def __init__(self):
         self.calls = []
         self.found_quote = "通勤人群预算较紧"
-        self.theory_id = "team_skill"
+        self.native_calls = []
         self.invalid_plan = None
+        self.has_explicit_persona = True
+        self.fail_native_person = False
 
     def complete(self, *, step, instruction, context, output):
         self.calls.append((step, context))
         if step == "jury_personas":
+            if not self.has_explicit_persona:
+                return output.model_validate({"personas": []})
             data = {"personas": [{
                 "name": "通勤补水者",
                 "traits": [{
@@ -38,39 +47,6 @@ class RecordingProvider:
                     "source_quote": self.found_quote,
                 }],
             }]}
-        elif step == "jury_theory_selection":
-            data = {"theory_ids": [self.theory_id]}
-        elif step == "jury_tinytroupe_dimensions":
-            assert "Given a sampling description" in instruction
-            data = {
-                "sampling_space_description": "购杯时所处的接触情境。",
-                "dimensions": [
-                    {"name": "接触情境", "kind": "exposure", "values": ["出门前", "到店后"]},
-                ],
-            }
-        elif step == "jury_tinytroupe_plan":
-            assert "Each *sampling directive* is a **combination**" in instruction
-            data = {"sample_plan": [
-                {
-                    "id": index,
-                    "subpopulation_description": f"{situation}留意水杯",
-                    "sampled_values": {"接触情境": situation},
-                    "quantity": 1,
-                }
-                for index, situation in enumerate(["出门前", "到店后"], start=1)
-            ]}
-            if self.invalid_plan == "count":
-                data["sample_plan"][0]["quantity"] = 2
-            if self.invalid_plan == "value":
-                data["sample_plan"][0]["sampled_values"]["接触情境"] = "未定义的情境"
-        elif step == "jury_tinytroupe_person":
-            assert "# Agent Generator" in instruction
-            situation = context["sampled_values"]["接触情境"]
-            data = {
-                "situation": f"{situation}留意水杯。",
-                "persona_prompt": f"你是预算较紧的通勤者，{situation}看到文案。",
-                "assumptions": [f"在{situation}看到文案。"],
-            }
         else:
             revised = context["ad_copy"] == AFTER
             data = {
@@ -86,6 +62,25 @@ class RecordingProvider:
             }
         return output.model_validate(data)
 
+    def chat(self, messages, **kwargs):
+        system, user = (message["content"] for message in messages[:2])
+        self.native_calls.append((system, user))
+        if self.fail_native_person and "# Agent Generator" in user:
+            raise ModelError("Test provider failure")
+        result = super().chat(messages, **kwargs)
+        if self.invalid_plan and "This function defines which and how many people" in system:
+            plan = json.loads(result["content"])
+            if self.invalid_plan == "count":
+                plan["sample_plan"][0]["quantity"] += 1
+            elif self.invalid_plan == "malformed":
+                plan["sample_plan"][0]["sampled_values"] = None
+            else:
+                plan["sample_plan"][0]["sampled_values"].pop("通勤携带优先项")
+            result["content"] = json.dumps(plan)
+        elif kwargs["json_mode"]:
+            result["content"] = json.dumps(json.loads(result["content"]))
+        return result
+
 
 def upload(client, *, content=REPORT.encode(), filename="research.txt"):
     return client.post("/api/jury/reports", files={"file": (filename, content)})
@@ -98,6 +93,7 @@ def get_json(response, status=200):
 
 def prepare_panel(client):
     report = get_json(upload(client), 201)
+    assert "source_text" not in report
     assert report["personas"][0]["traits"][0]["source_quote"] == "通勤人群预算较紧"
     assert get_json(client.get("/api/jury/reports/" + report["report_id"])) == report
     return get_json(client.post("/api/jury/panels", json={
@@ -111,7 +107,7 @@ def advance(client, case_path, index):
     return client.post(case_path + "/advance", json={"expected_index": index})
 
 
-def test_confirmed_persona_uses_a_selected_skill_and_blind_ab_pairs_resume(tmp_path):
+def test_confirmed_persona_uses_the_configured_skill_and_blind_ab_pairs_resume(tmp_path):
     provider = RecordingProvider()
     skill = tmp_path / "SKILL.md"
     skill.write_text("Use purchase occasions to vary the attention budget.", encoding="utf-8")
@@ -123,11 +119,18 @@ def test_confirmed_persona_uses_a_selected_skill_and_blind_ab_pairs_resume(tmp_p
         assert panel["theories"][0]["theory_id"] == "team_skill"
         assert panel["base_persona"]["name"] == "通勤补水者"
         assert len({m["member_id"] for m in panel["members"]}) == 2
-        assert provider.calls[2][1]["theories"][0]["content"] == skill.read_text()
-        assert "content" not in provider.calls[1][1]["available_theories"][0]
-        assert [step for step, _ in provider.calls[2:]] == [
-            "jury_tinytroupe_dimensions", "jury_tinytroupe_plan", "jury_tinytroupe_person", "jury_tinytroupe_person",
-        ]
+        assert set(panel["members"][0]["sampled_values"]) >= {"通勤携带优先项", "清洁偏好"}
+        dimension_system, dimension_user = provider.native_calls[0]
+        description = _factory_arguments(dimension_user)["sampling_space_description"]
+        assert "Given a sampling description" in dimension_system
+        assert skill.read_text() in description
+        assert REPORT in description
+        assert skill.read_text() not in dimension_system
+        assert all(
+            skill.read_text() in user
+            for _, user in provider.native_calls
+            if "# Agent Generator" in user
+        )
         case = get_json(client.post("/api/jury/comparisons", json={
             "panel_id": panel["panel_id"], "original_text": BEFORE, "revised_text": AFTER,
         }), 201)
@@ -152,11 +155,73 @@ def test_confirmed_persona_uses_a_selected_skill_and_blind_ab_pairs_resume(tmp_p
     assert {frozenset(context) for context in reactions} == {
         frozenset({"base_persona", "member", "ad_copy"})
     }
+    names = [member["specification"]["persona"]["name"] for member in panel["members"]]
     assert [(c["member"]["name"], c["ad_copy"]) for c in reactions] == [
-        ("模拟成员 1", BEFORE), ("模拟成员 1", AFTER), ("模拟成员 2", AFTER), ("模拟成员 2", BEFORE),
+        (names[0], BEFORE), (names[0], AFTER), (names[1], AFTER), (names[1], BEFORE),
     ]
     assert reactions[0]["member"] == reactions[1]["member"]
     assert reactions[2]["member"] == reactions[3]["member"]
+
+
+def test_report_with_no_persona_uses_same_original_prompt_with_optional_skill(tmp_path):
+    provider = RecordingProvider()
+    provider.has_explicit_persona = False
+    database = tmp_path / "jury.db"
+    skill = tmp_path / "SKILL.md"
+    skill.write_text("用营销理论考察消费者会先核对哪类环保依据。", encoding="utf-8")
+    with TestClient(create_app(database_path=database, provider=provider)) as client:
+        report = get_json(upload(client), 201)
+        assert report["personas"] == []
+        request = {"report_id": report["report_id"], "member_count": 2}
+        bare = get_json(client.post("/api/jury/panels", json=request), 201)
+
+    with TestClient(create_app(database_path=database, provider=provider, skill_path=skill)) as client:
+        skilled = get_json(client.post("/api/jury/panels", json=request), 201)
+
+    dimensions = [(system, user) for system, user in provider.native_calls if "Given a sampling description" in system]
+    assert len(dimensions) == 2
+    assert dimensions[0][0] == dimensions[1][0]
+    assert REPORT in _factory_arguments(dimensions[0][1])["sampling_space_description"]
+    enriched = _factory_arguments(dimensions[1][1])["sampling_space_description"]
+    assert REPORT in enriched and skill.read_text() in enriched
+    assert bare["theories"] == [] and skilled["theories"][0]["theory_id"] == "team_skill"
+    for panel in (bare, skilled):
+        assert panel["base_persona"] is None
+        assert all(seat["specification"]["type"] == "TinyPerson" for seat in panel["members"])
+
+
+def test_saved_legacy_members_can_finish_an_ab_comparison(tmp_path):
+    provider = RecordingProvider()
+    database = tmp_path / "jury.db"
+    panel_id = str(uuid4())
+    member_id = str(uuid4())
+    with TestClient(create_app(database_path=database, provider=provider)) as client:
+        report = get_json(upload(client), 201)
+        legacy = {
+            "panel_id": panel_id, "report_id": report["report_id"], "mode": "live", "model": provider.model,
+            "base_persona": report["personas"][0], "theories": [],
+            "members": [{
+                "member_id": member_id, "name": "旧面板角色", "persona_prompt": "重视价格。",
+                "situation": "上班路上", "assumptions": ["赶着去办公室"], "theory_ids": ["jtbd"],
+            }],
+        }
+        with sqlite3.connect(database) as connection:
+            connection.execute(
+                "INSERT INTO jury_records (kind, id, body) VALUES ('panel', ?, ?)",
+                (panel_id, json.dumps(legacy, ensure_ascii=False)),
+            )
+        comparison = get_json(client.post("/api/jury/comparisons", json={
+            "panel_id": panel_id, "original_text": BEFORE, "revised_text": AFTER,
+        }), 201)
+        path = "/api/jury/comparisons/" + comparison["comparison_id"]
+        assert get_json(advance(client, path, 0))["next_index"] == 1
+
+    with TestClient(create_app(database_path=database, provider=provider)) as client:
+        result = get_json(advance(client, path, 1))
+        assert result["next_index"] is None
+        assert result["pairs"][0]["member_name"] == "旧面板角色"
+    assert provider.calls[-2][1]["member"] == provider.calls[-1][1]["member"]
+    assert provider.calls[-1][1]["member"]["persona_prompt"] == "重视价格。"
 
 
 def test_a_claimed_source_must_exist_in_the_uploaded_report(tmp_path):
@@ -167,10 +232,9 @@ def test_a_claimed_source_must_exist_in_the_uploaded_report(tmp_path):
         assert upload(client).status_code == 502
 
 
-@pytest.mark.parametrize("fault", ["count", "value"])
+@pytest.mark.parametrize("fault", ["count", "malformed", "missing_dimension"])
 def test_invalid_tinytroupe_plan_stops_before_creating_personas(tmp_path, fault):
     provider = RecordingProvider()
-    provider.theory_id = "jtbd"
     provider.invalid_plan = fault
     app = create_app(database_path=tmp_path / "jury.sqlite3", provider=provider)
     with TestClient(app) as client:
@@ -181,7 +245,24 @@ def test_invalid_tinytroupe_plan_stops_before_creating_personas(tmp_path, fault)
             "member_count": 2,
         })
         assert response.status_code == 502
-    assert [step for step, _ in provider.calls[-2:]] == ["jury_tinytroupe_dimensions", "jury_tinytroupe_plan"]
+    assert not any("# Agent Generator" in user for _, user in provider.native_calls)
+    assert not any("Generates a single full name" in system for system, _ in provider.native_calls)
+
+
+def test_model_error_in_explicit_sampling_is_retryable(tmp_path):
+    provider = RecordingProvider()
+    provider.fail_native_person = True
+    app = create_app(database_path=tmp_path / "jury.db", provider=provider)
+    with TestClient(app) as client:
+        report = get_json(upload(client), 201)
+        response = client.post("/api/jury/panels", json={
+            "report_id": report["report_id"],
+            "member_count": 1,
+            "sampling": {"mode": "random", "space": {"dimensions": [
+                {"name": "接触场景", "kind": "exposure", "values": ["地铁", "手机"]},
+            ]}},
+        })
+        assert response.status_code == 502
 
 
 def test_docx_table_text_can_ground_a_profile(tmp_path):

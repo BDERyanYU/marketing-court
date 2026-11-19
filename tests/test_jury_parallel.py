@@ -18,6 +18,7 @@ class RecordingProvider(demo.DemoProvider):
         self.active = 0
         self.peak = 0
         self.first_pair = Barrier(2, timeout=2) if verify_overlap else None
+        self.first_wave = set()
         self.fail_once = None
 
     def complete(self, *, step, instruction, context, output):
@@ -40,9 +41,7 @@ class RecordingProvider(demo.DemoProvider):
             if fail:
                 self.fail_once = None
         try:
-            if self.first_pair is not None and key in {
-                ("模拟成员 1", demo.ORIGINAL), ("模拟成员 2", demo.REVISED),
-            }:
+            if self.first_pair is not None and key in self.first_wave:
                 self.first_pair.wait()
             if fail:
                 return httpx.Response(502)
@@ -79,6 +78,8 @@ def test_members_overlap_and_each_member_uses_one_frozen_profile(tmp_path, monke
 
     with TestClient(app) as client:
         path, panel = make_comparison(client)
+        names = [member["specification"]["persona"]["name"] for member in panel["members"]]
+        provider.first_wave = {(names[0], demo.ORIGINAL), (names[1], demo.REVISED)}
         first = advance_members(client, path, 0).raise_for_status().json()
         assert len(first["exposures"]) == 4 and first["next_index"] == 4
         assert advance_members(client, path, 0).raise_for_status().json() == first
@@ -88,11 +89,13 @@ def test_members_overlap_and_each_member_uses_one_frozen_profile(tmp_path, monke
     assert len(provider.calls) == 6
     assert final["next_index"] is None
     assert [pair["member_id"] for pair in final["pairs"]] == [member["member_id"] for member in panel["members"]]
-    for index, member in enumerate(panel["members"]):
-        calls = [call for call in provider.calls if call["member"]["name"] == member["name"]]
+    for index, name in enumerate(names):
+        calls = [call for call in provider.calls if call["member"]["name"] == name]
         order = [demo.ORIGINAL, demo.REVISED] if index % 2 == 0 else [demo.REVISED, demo.ORIGINAL]
         assert [call["ad_copy"] for call in calls] == order
         assert calls[0]["member"] == calls[1]["member"]
+        assert set(calls[0]["member"]) == {"name", "specification"}
+        assert calls[0]["member"]["specification"] == panel["members"][index]["specification"]
         assert calls[0]["base_persona"] == calls[1]["base_persona"]
 
 
@@ -103,9 +106,10 @@ def test_parallel_wave_saves_other_members_and_resumes_a_failed_version(tmp_path
 
     with TestClient(create_app(database_path=database, provider=provider)) as client:
         path, panel = make_comparison(client)
+        name = panel["members"][0]["specification"]["persona"]["name"]
         checkpoint = client.post(path + "/advance", json={"expected_index": 0}).raise_for_status().json()
         assert checkpoint["next_index"] == 1
-        provider.fail_once = ("模拟成员 1", demo.REVISED)
+        provider.fail_once = (name, demo.REVISED)
 
         assert advance_members(client, path, 1).status_code == 502
         partial = client.get(path).raise_for_status().json()
@@ -123,5 +127,5 @@ def test_parallel_wave_saves_other_members_and_resumes_a_failed_version(tmp_path
 
     calls = Counter((item["member"]["name"], item["ad_copy"]) for item in provider.calls)
     assert len(calls) == 6
-    assert calls.pop(("模拟成员 1", demo.REVISED)) == 2
+    assert calls.pop((name, demo.REVISED)) == 2
     assert set(calls.values()) == {1}
