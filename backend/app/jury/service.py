@@ -5,6 +5,7 @@ from uuid import UUID, uuid4
 from ..core.model_api import ModelProvider
 
 from . import demo
+from .examples import PAPER_REPORT, PAPER_ORIGINAL, PAPER_REVISED
 from .aggregate import comparison_view
 from .models import Comparison, ComparisonRequest, ComparisonView, Panel, PanelRequest, Persona, Report, StoredReport, Trait
 from .planner import derive_panel, extract_personas
@@ -37,7 +38,7 @@ class JuryService:
         self._in_progress: set[UUID] = set()
 
     def upload_report(self, filename: str, text: str) -> Report:
-        if self.provider.mode == "demo" and text != demo.REPORT:
+        if self.provider.mode == "demo" and text not in (demo.REPORT, PAPER_REPORT):
             raise JuryError("演示模式使用预置报告。运行真实模式可分析自己的报告。")
         report = extract_personas(self.provider, filename, text)
         self.repo.create("report", report.report_id, StoredReport(**report.model_dump(), source_text=text))
@@ -85,8 +86,11 @@ class JuryService:
     def start_comparison(self, request: ComparisonRequest) -> ComparisonView:
         panel = self.get_panel(request.panel_id)
         self._check_model(panel)
-        if self.provider.mode == "demo" and (request.original_text, request.revised_text) != (demo.ORIGINAL, demo.REVISED):
-            raise JuryError("演示模式使用预置的两版文案。")
+        if self.provider.mode == "demo":
+            report = self.get_report(panel.report_id)
+            expected = (PAPER_ORIGINAL, PAPER_REVISED) if report.source_text == PAPER_REPORT else (demo.ORIGINAL, demo.REVISED)
+            if (request.original_text, request.revised_text) != expected:
+                raise JuryError("演示模式使用与当前报告对应的两版预设文案。")
         comparison = Comparison(
             **request.model_dump(), comparison_id=uuid4(), mode=panel.mode, model=panel.model,
         )

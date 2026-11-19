@@ -2076,9 +2076,91 @@ summary {
   flex-shrink: 0;
 }
 .sidebar-project-name {
+  flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.sidebar-project-row {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 3px;
+}
+.sidebar nav .sidebar-project-row .sidebar-project {
+  flex: 1;
+  width: 0;
+  padding-right: 8px;
+}
+.sidebar nav .project-delete {
+  flex: 0 0 34px;
+  width: 34px;
+  height: 36px;
+  padding: 8px;
+  justify-content: center;
+  color: #a9bbcc;
+}
+.sidebar nav .project-delete:hover:not(:disabled) {
+  color: #ffd7d7;
+  background: #583a48;
+}
+.delete-project-dialog {
+  width: min(450px, calc(100vw - 32px));
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 30px;
+  color: var(--ink);
+  background: white;
+  box-shadow: 0 24px 80px #182f4733;
+}
+.delete-project-dialog::backdrop {
+  background: #142b4366;
+}
+.delete-dialog-icon {
+  display: inline-flex;
+  padding: 10px;
+  border-radius: 12px;
+  background: #fff0f0;
+  color: #a73540;
+}
+.delete-project-dialog h2 {
+  margin: 18px 0 12px;
+  font-size: 22px;
+}
+.delete-project-dialog p {
+  font-size: 13px;
+  line-height: 1.9;
+  overflow-wrap: anywhere;
+}
+.delete-project-name {
+  font-weight: 600;
+}
+.delete-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 24px;
+}
+.danger-button {
+  color: white;
+  background: #a73540;
+  border: 1px solid #a73540;
+  padding: 10px 18px;
+  border-radius: 8px;
+}
+.danger-button:hover:not(:disabled) {
+  background: #8d2933;
+}
+.delete-dialog-error {
+  color: #a73540;
+}
+@media (max-width: 740px) {
+  .sidebar-project-row {
+    flex: 0 0 230px;
+  }
+  .delete-project-dialog {
+    padding: 24px;
+  }
 }
 .sidebar-project-empty {
   margin: 10px 15px;

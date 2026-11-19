@@ -121,7 +121,9 @@ def test_invalid_citation_can_retry_without_repeating_ocr(tmp_path):
 def test_restart_marks_running_tasks_interrupted(tmp_path):
     path = tmp_path / "app.db"
     store = Store(path)
-    task, _ = store.start_task("review", "asset-missing", "live", "test-model")
+    with TestClient(create_app(database_path=path, provider=Provider())) as client:
+        asset = uploaded(client)
+    task, _ = store.start_task("review", asset["asset_version_id"], "live", "test-model")
     task.status = "running"
     task.checkpoints = {"anchors": []}
     store.save_task(task)

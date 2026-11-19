@@ -84,6 +84,22 @@ export default function Jury({ onMode }: { onMode: (mode: Health) => void }) {
   const modeCallback = useRef(onMode)
   modeCallback.current = onMode
   const restored = useRef(false)
+  const restoreDraft = (id: string) => {
+    try {
+      const draft = JSON.parse(sessionStorage.getItem(`persona-copy-${id}`) ?? '{}')
+      setOriginal(typeof draft.original === 'string' ? draft.original : '')
+      setRevised(typeof draft.revised === 'string' ? draft.revised : '')
+    } catch {
+      /* A missing draft does not prevent restoring the saved report. */
+    }
+  }
+  useEffect(() => {
+    if (report)
+      sessionStorage.setItem(
+        `persona-copy-${report.report_id}`,
+        JSON.stringify({ original, revised }),
+      )
+  }, [report?.report_id, original, revised])
 
   const remember = (kind: 'report' | 'panel' | 'comparison', id: string) => {
     const url = `/jury?${new URLSearchParams({ [kind]: id })}`
@@ -95,6 +111,7 @@ export default function Jury({ onMode }: { onMode: (mode: Health) => void }) {
     const source = await api<PersonaReport>(`/api/jury/reports/${saved.report_id}`)
     setPanel(saved)
     setReport(source)
+    restoreDraft(source.report_id)
     setCount(saved.members.length)
     const base = saved.base_persona
     if (base === null) setSelected('report')
@@ -132,6 +149,7 @@ export default function Jury({ onMode }: { onMode: (mode: Health) => void }) {
       remember('panel', panelId)
     } else if (reportId) {
       setReport(await api<PersonaReport>(`/api/jury/reports/${encodeURIComponent(reportId)}`))
+      restoreDraft(reportId)
       remember('report', reportId)
     }
     setStatus('')
@@ -180,12 +198,20 @@ export default function Jury({ onMode }: { onMode: (mode: Health) => void }) {
     event.preventDefault()
     if (file) void action('正在读取报告并提取画像…', () => upload(file))
   }
-  const useSample = () =>
-    void action('正在读取水杯样例…', async () => {
-      const value = sample ?? (await api<PersonaSample>('/api/jury/demo'))
+  const useSample = (id: 'bottle' | 'copier-paper') =>
+    void action(`正在读取${id === 'bottle' ? '水杯' : '复印纸'}样例并提取画像…`, async () => {
+      const value =
+        id === 'bottle'
+          ? (sample ?? (await api<PersonaSample>('/api/jury/demo')))
+          : await api<PersonaSample>('/api/jury/examples/copier-paper')
+      await upload(
+        new File([value.report_text], value.filename ?? 'bottle-research.txt', {
+          type: 'text/plain',
+        }),
+      )
       setOriginal(value.original_text)
       setRevised(value.revised_text)
-      await upload(new File([value.report_text], 'bottle-research.txt', { type: 'text/plain' }))
+      if (value.notice) setStatus(`复印纸报告与 A/B 文案已载入。${value.notice}`)
     })
   const derive = (event: FormEvent) => {
     event.preventDefault()
@@ -339,7 +365,7 @@ export default function Jury({ onMode }: { onMode: (mode: Health) => void }) {
       {sample?.mode === 'demo' && (
         <div className="notice">
           <Icon name="file" size={17} />
-          <span>固定演示模式：请使用水杯样例和预设文案。报告、人像和反馈均为演示数据。</span>
+          <span>固定演示模式：请使用水杯或复印纸样例及其预设文案。人像与反馈均为演示数据。</span>
         </div>
       )}
       <div className="persona-setup-grid">
@@ -381,9 +407,17 @@ export default function Jury({ onMode }: { onMode: (mode: Health) => void }) {
                 type="button"
                 className="secondary"
                 disabled={busy || !sample}
-                onClick={useSample}
+                onClick={() => useSample('bottle')}
               >
                 用水杯样例
+              </button>
+              <button
+                type="button"
+                className="secondary"
+                disabled={busy || !sample}
+                onClick={() => useSample('copier-paper')}
+              >
+                用复印纸样例
               </button>
             </div>
           </form>
@@ -394,6 +428,9 @@ export default function Jury({ onMode }: { onMode: (mode: Health) => void }) {
           )}
           <p className="persona-privacy">
             报告文字与测试文案会发送至已配置的模型；记录保存在本机。
+          </p>
+          <p className="persona-privacy">
+            复印纸样例含德国市场四类客群及 A/B 文案，产品属性与认证待核验。
           </p>
         </section>
         <section className="panel persona-target-panel">

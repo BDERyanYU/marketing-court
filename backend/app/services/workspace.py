@@ -33,6 +33,9 @@ def audience_snapshot(store, project_id):
 
 def upsert(store, kind, identifier, parent, value):
     with store.connection() as db:
+        db.execute("BEGIN IMMEDIATE")
+        if kind != "persona" and db.execute("SELECT 1 FROM records WHERE kind='project' AND id=?", (parent,)).fetchone() is None:
+            raise HTTPException(404, "项目已删除，请重新选择项目。")
         db.execute("INSERT INTO records VALUES (?, ?, ?, ?) ON CONFLICT(kind,id) DO UPDATE SET payload=excluded.payload",
                    (kind, identifier, parent, value.model_dump_json()))
 

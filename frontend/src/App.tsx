@@ -64,6 +64,18 @@ export default function App() {
   const [task, setTask] = useState<Task | null>(null)
   const [busy, setBusy] = useState('')
   const [error, setError] = useState('')
+  const [deletingProject, setDeletingProject] = useState<Project | null>(null)
+  const [deleteError, setDeleteError] = useState('')
+  const [deleteBusy, setDeleteBusy] = useState(false)
+  const deleteDialog = useRef<HTMLDialogElement>(null)
+  const deleteTrigger = useRef<HTMLButtonElement | null>(null)
+  useEffect(() => {
+    if (deletingProject) deleteDialog.current?.showModal()
+    else if (deleteDialog.current?.open) {
+      deleteDialog.current.close()
+      if (deleteTrigger.current?.isConnected) deleteTrigger.current.focus()
+    }
+  }, [deletingProject])
   const [restored, setRestored] = useState(false)
   const refreshProjects = useCallback(
     async () => setProjects(await api<Project[]>('/api/projects')),
@@ -208,6 +220,42 @@ export default function App() {
       setTask(null)
       navigate('review')
     })
+  const confirmDelete = async () => {
+    if (!deletingProject || deleteBusy) return
+    setDeleteBusy(true)
+    setDeleteError('')
+    try {
+      const id = deletingProject.project_id
+      const result = await api<{ file_cleanup_pending: boolean }>(`/api/projects/${id}`, {
+        method: 'DELETE',
+      })
+      setProjects((items) => items.filter((p) => p.project_id !== id))
+      if (review?.project_id === id || asset?.project_id === id) {
+        setReview(null)
+        setAsset(null)
+        setRewrites([])
+        setRechecks({})
+        setSelectedRisk('')
+        setTask(null)
+      }
+      if (projectId === id) {
+        setProjectId('')
+        setHistory(null)
+        setHistoryError('')
+        if (page !== 'persona') navigate('setup')
+      }
+      setError(
+        result.file_cleanup_pending
+          ? '项目已删除，部分原图文件未能清理，请检查文件是否被占用。'
+          : '',
+      )
+      setDeletingProject(null)
+    } catch (e) {
+      setDeleteError(e instanceof Error ? e.message : '删除失败，请重试。')
+    } finally {
+      setDeleteBusy(false)
+    }
+  }
   return (
     <div className="app-layout">
       <a className="skip-link" href="#main-content">
@@ -253,20 +301,34 @@ export default function App() {
           </div>
           <div className="sidebar-project-list" aria-label="我的项目">
             {projects.map((project) => (
-              <button
-                key={project.project_id}
-                className="sidebar-project"
-                title={project.name}
-                aria-current={
-                  page !== 'persona' && projectId === project.project_id ? 'page' : undefined
-                }
-                disabled={locked}
-                onClick={() => openProject(project.project_id)}
-              >
-                <Icon name="file" size={17} />
-                <span className="sidebar-project-name">{project.name}</span>
-                <span className="nav-indicator" />
-              </button>
+              <div className="sidebar-project-row" key={project.project_id}>
+                <button
+                  className="sidebar-project"
+                  title={project.name}
+                  aria-current={
+                    page !== 'persona' && projectId === project.project_id ? 'page' : undefined
+                  }
+                  disabled={locked}
+                  onClick={() => openProject(project.project_id)}
+                >
+                  <Icon name="file" size={17} />
+                  <span className="sidebar-project-name">{project.name}</span>
+                  <span className="nav-indicator" />
+                </button>
+                <button
+                  className="project-delete"
+                  aria-label={`删除项目：${project.name}`}
+                  title="删除项目"
+                  disabled={locked || deleteBusy}
+                  onClick={(event) => {
+                    deleteTrigger.current = event.currentTarget
+                    setDeleteError('')
+                    setDeletingProject(project)
+                  }}
+                >
+                  <Icon name="trash" size={16} />
+                </button>
+              </div>
             ))}
             {projects.length === 0 && (
               <p className="sidebar-project-empty">创建项目后会显示在这里</p>
@@ -452,6 +514,47 @@ export default function App() {
           <span className="footer-wordmark">Marketing Court</span>
         </footer>
       </div>
+      <dialog
+        ref={deleteDialog}
+        className="delete-project-dialog"
+        aria-labelledby="delete-project-title"
+        aria-describedby="delete-project-description"
+        onCancel={(event) => {
+          event.preventDefault()
+          if (!deleteBusy) setDeletingProject(null)
+        }}
+      >
+        <span className="delete-dialog-icon">
+          <Icon name="trash" size={24} />
+        </span>
+        <h2 id="delete-project-title">删除这个项目？</h2>
+        <p className="delete-project-name">{deletingProject?.name}</p>
+        <p id="delete-project-description">
+          该项目的素材、审核记录、改写和讨论记录将一起删除，无法恢复。用户画像库与独立的数字人像测试记录会保留。
+        </p>
+        {deleteError && (
+          <p className="delete-dialog-error" role="alert">
+            {deleteError}
+          </p>
+        )}
+        <div className="delete-dialog-actions">
+          <button
+            className="secondary"
+            autoFocus
+            disabled={deleteBusy}
+            onClick={() => setDeletingProject(null)}
+          >
+            取消
+          </button>
+          <button
+            className="danger-button"
+            disabled={deleteBusy}
+            onClick={() => void confirmDelete()}
+          >
+            {deleteBusy ? '正在删除…' : '确认删除'}
+          </button>
+        </div>
+      </dialog>
     </div>
   )
 }

@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any
 
 from ..core.model_api import ModelError, Output, RunMode
+from .examples import PAPER_REPORT, PAPER_ORIGINAL, PAPER_REVISED, PAPER_DIMENSIONS, paper_personas, paper_persona, paper_reaction
 
 
 REPORT = (Path(__file__).parent / "examples" / "bottle-research.txt").read_text(encoding="utf-8").strip()
@@ -30,6 +31,8 @@ class DemoProvider:
         self, *, step: str, instruction: str, context: dict[str, Any], output: type[Output],
     ) -> Output:
         if step == "jury_personas":
+            if context["report_text"] == PAPER_REPORT:
+                return output.model_validate({"personas": paper_personas()})
             return output.model_validate({"personas": [{
                 "name": PERSONA_NAME,
                 "traits": [
@@ -48,8 +51,12 @@ class DemoProvider:
                 ],
             }]})
         if step == "jury_dimensions":
+            if "卡纸" in context["sampling_space_description"] or "复印纸" in context["sampling_space_description"]:
+                return output.model_validate({"dimensions": [{**d, "kind": "trait"} for d in PAPER_DIMENSIONS]})
             return output.model_validate({"dimensions": BOTTLE_DIMENSIONS})
         if step == "jury_reaction":
+            if context["ad_copy"] in (PAPER_ORIGINAL, PAPER_REVISED):
+                return output.model_validate(paper_reaction(context["ad_copy"]))
             member = context["member"]
             return output.model_validate(demo_reaction(member, context["ad_copy"]))
         raise ModelError("未知的演示步骤。")
@@ -59,17 +66,18 @@ class DemoProvider:
         user = messages[1]["content"]
         if "Given a sampling description" in system:
             description = _factory_arguments(user)["sampling_space_description"]
-            dimensions = NATIVE_DIMENSIONS.copy()
+            paper = "卡纸" in description or "复印纸" in description
+            dimensions = PAPER_DIMENSIONS.copy() if paper else NATIVE_DIMENSIONS.copy()
             if "团队营销 Skill\n" in description:
                 dimensions.append(MARKETING_DIMENSION)
-            result = {"sampling_space_description": "便携水杯访谈里的购买关注点", "dimensions": dimensions}
+            result = {"sampling_space_description": "复印纸调研里的采购关注点" if paper else "便携水杯访谈里的购买关注点", "dimensions": dimensions}
         elif "This function defines which and how many people" in system:
             arguments = _factory_arguments(user)
             quantities = [1] if arguments["N"] == 1 else [arguments["N"] - 1, 1]
             result = {"sample_plan": [
                 {
                     "id": index + 1,
-                    "subpopulation_description": "水杯演示组合 " + str(index + 1),
+                    "subpopulation_description": "固定演示组合 " + str(index + 1),
                     "sampled_values": {
                         dimension["name"]: dimension["values"][index]
                         for dimension in arguments["sampling_dimensions"]["dimensions"]
@@ -85,9 +93,9 @@ class DemoProvider:
             particularities = unescape(user.split("## Agent Particularities", 1)[1])
             values, _ = json.JSONDecoder().raw_decode(particularities[particularities.index("{"):])
             name = values.get("name", f"模拟成员 {self._names}")
-            result = _bottle_persona(name, values)
+            result = paper_persona(name, values) if "打印场景" in values or "购买关注点" in values else _bottle_persona(name, values)
         elif "given a short biography" in system:
-            result = "通勤时随身带水，买杯子时会比较实际用途和价格。"
+            result = "比较再生复印纸的颜色、打印用途和设备适配。" if "复印纸" in user else "通勤时随身带水，买杯子时会比较实际用途和价格。"
         else:
             raise ModelError("未知的 TinyTroupe 演示步骤。")
         if isinstance(result, str) and json_mode:

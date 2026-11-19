@@ -15,8 +15,10 @@ export type IconName =
   | 'chevron'
   | 'spark'
   | 'back'
+  | 'trash'
 
 const paths: Record<IconName, ReactNode> = {
+  trash: <path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7" />,
   scales: (
     <>
       <path d="M12 3v17M5 21h14M5 7h14M12 3l-2 4M12 3l2 4M5 7l-4 7h8L5 7Zm14 0-4 7h8l-4-7Z" />

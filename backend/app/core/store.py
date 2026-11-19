@@ -1,5 +1,6 @@
 """Small SQLite JSON repository with atomic task and result writes."""
 
+import json
 import sqlite3
 from contextlib import contextmanager
 from datetime import UTC, datetime
@@ -52,7 +53,34 @@ class Store:
 
     def add(self, kind: str, identifier: str, parent: str, value: BaseModel):
         with self.connection() as db:
+            db.execute("BEGIN IMMEDIATE")
+            if kind in {"asset", "review", "project_context", "meeting", "report_addendum", "review_decision"}:
+                if db.execute("SELECT 1 FROM records WHERE kind='project' AND id=?", (parent,)).fetchone() is None:
+                    raise HTTPException(404, "项目已删除，请重新选择项目。")
             self.write(db, kind, identifier, parent, value)
+
+    def delete_project(self, project_id: str) -> list[str]:
+        """Delete project-owned data atomically, retaining shared persona libraries."""
+        with self.connection() as db:
+            db.execute("BEGIN IMMEDIATE")
+            if db.execute("SELECT 1 FROM records WHERE kind='project' AND id=?", (project_id,)).fetchone() is None:
+                raise HTTPException(404, "项目不存在或已删除。")
+            rows = db.execute("SELECT kind,id,payload FROM records WHERE parent=?", (project_id,)).fetchall()
+            asset_ids = {r["id"] for r in rows if r["kind"] == "asset"}
+            review_ids = {r["id"] for r in rows if r["kind"] == "review"}
+            tasks = [r for r in db.execute("SELECT id,kind,resource,payload FROM review_tasks").fetchall()
+                     if (r["kind"] == "review" and r["resource"] in asset_ids)
+                     or (r["kind"] == "rewrite" and r["resource"].split("/", 1)[0] in review_ids)]
+            if any(json.loads(r["payload"])["status"] in {"queued", "running"} for r in tasks) or any(
+                r["kind"] == "meeting" and json.loads(r["payload"])["status"] == "generating" for r in rows
+            ):
+                raise HTTPException(409, "项目正在处理审核或生成内容，请等待完成后再删除。")
+            files = [json.loads(r["payload"]).get("storage_name", "") for r in rows if r["kind"] == "asset"]
+            db.executemany("DELETE FROM review_tasks WHERE id=?", [(r["id"],) for r in tasks])
+            db.executemany("DELETE FROM records WHERE kind='rewrite' AND parent=?", [(r,) for r in review_ids])
+            db.execute("DELETE FROM records WHERE parent=? AND kind!='persona'", (project_id,))
+            db.execute("DELETE FROM records WHERE kind='project' AND id=?", (project_id,))
+        return [name for name in files if name]
 
     def get(self, kind: str, identifier: str, schema):
         with self.connection() as db:
@@ -80,6 +108,11 @@ class Store:
         task = Task(task_id=new_id("task"), kind=kind, resource_id=resource, mode=mode, model=model,
                     status="queued", stage="queued", created_at=now())
         with self.connection() as db:
+            db.execute("BEGIN IMMEDIATE")
+            owner_kind = "asset" if kind == "review" else "review"
+            owner_id = resource if kind == "review" else resource.split("/", 1)[0]
+            if db.execute("SELECT 1 FROM records WHERE kind=? AND id=?", (owner_kind, owner_id)).fetchone() is None:
+                raise HTTPException(404, "素材或审核已删除，请重新选择项目。")
             inserted = db.execute("INSERT INTO review_tasks VALUES (?, ?, ?, ?) ON CONFLICT(kind, resource) DO NOTHING",
                                  (task.task_id, kind, resource, task.model_dump_json())).rowcount
             row = db.execute("SELECT payload FROM review_tasks WHERE kind=? AND resource=?", (kind, resource)).fetchone()

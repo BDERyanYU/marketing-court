@@ -1,6 +1,7 @@
 """Review routes. All business changes are performed on the server."""
 
 import hashlib
+import logging
 from pathlib import Path
 
 from fastapi import APIRouter, BackgroundTasks, Form, HTTPException, UploadFile
@@ -29,6 +30,25 @@ def build_review_router(store, workflow, storage: Path):
         store.add("project", project.project_id, project.project_id, project)
         return project
 
+    @router.delete("/projects/{project_id}")
+    def delete_project(project_id: str):
+        filenames = store.delete_project(project_id)
+        cleanup_pending = False
+        root = storage.resolve()
+        for filename in filenames:
+            path = (root / filename).resolve()
+            # Only remove this project's files directly inside the configured upload directory.
+            if path.parent != root:
+                logging.getLogger(__name__).warning("Skipped invalid project upload path")
+                cleanup_pending = True
+                continue
+            try:
+                path.unlink(missing_ok=True)
+            except OSError:
+                logging.getLogger(__name__).warning("Could not remove a deleted project's upload", exc_info=True)
+                cleanup_pending = True
+        return {"deleted_project_id": project_id, "file_cleanup_pending": cleanup_pending}
+
     @router.post("/projects/{project_id}/assets", response_model=AssetVersion, status_code=201)
     async def upload(project_id: str, file: UploadFile | None = None,
                      text: str = Form(default="", max_length=8000)):
@@ -56,7 +76,11 @@ def build_review_router(store, workflow, storage: Path):
             original_filename=Path(file.filename or "upload").name[:200], sha256=digest, width=width,
             height=height, storage_name=filename, image_url=f"/api/assets/{asset_id}/image",
             text=text or None, created_at=now())
-        store.add("asset", asset_id, project_id, asset)
+        try:
+            store.add("asset", asset_id, project_id, asset)
+        except Exception:
+            (storage / filename).unlink(missing_ok=True)
+            raise
         return asset
 
     @router.get("/assets/{asset_id}", response_model=AssetVersion)

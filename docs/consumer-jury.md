@@ -43,6 +43,7 @@ JURY_THEORY_SKILL_FILE="$PWD/skills/persona-derivation/SKILL.md" \
 
 | 方法与路径 | 输出 |
 |---|---|
+| `GET /api/jury/examples/copier-paper` | 用户提供的德国复印纸调研正文、A/B 文案和未核验说明 |
 | `POST /api/jury/reports` | 上传字段 `file`，返回报告 ID 和待确认画像 |
 | `GET /api/jury/reports/{report_id}` | 读取提取的画像、证据摘录和处理方式 |
 | `POST /api/jury/panels` | 传 `report_id`，可选传 `persona_id` 或 `manual_persona`，返回固定面板、抽样计划及 Skill 版本 |
@@ -69,3 +70,9 @@ API 的 `sampling.mode` 还可显式设为 `random` 或 `full`。在这两种模
 ## 测试
 
 从项目根目录运行 `.venv/bin/python -m pytest -q`。覆盖无明确画像的报告直接派生、Skill 进入同一条原版提示流程、TinyTroupe 联合配额、固定成员的 A/B 请求隔离、计票、恢复和演示模式。
+
+## 复印纸样例
+
+点击“用复印纸样例”同时载入用户提供的《测试用-复印纸-用户画像调研报告.docx》正文和两版 Amazon Basics 文案。正文及文案保存在 `backend/app/jury/examples/copier-paper-*.txt`；报告四类客群为企业行政采购、公共机构/非营利组织、环保居家办公、家庭与学生。A 版的 `(5 Rivers)` 及 B 版 Blue Angel 声明按用户输入保留，不代表系统已核实产品事实、认证或报告中的法规描述。
+
+实时模式正常提取报告并派生人像；固定模式使用复印纸专属预设数据，并校验两版文案与报告对应，避免混用水杯样例。固定反馈不是对 B 版有效性的真实证据。水杯 `/api/jury/demo` 接口保持兼容。

@@ -77,6 +77,8 @@ export interface Comparison {
   notice: string
 }
 export interface PersonaSample {
+  filename?: string
+  notice?: string
   report_text: string
   original_text: string
   revised_text: string

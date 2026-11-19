@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 from uuid import UUID
 
-from fastapi import APIRouter, FastAPI, Request, UploadFile
+from fastapi import APIRouter, FastAPI, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, JSONResponse
 
 from ..core.model_api import ModelError, ModelProvider, configured_provider
@@ -10,6 +10,7 @@ from ..core.paths import PROJECT_ROOT
 from ..core.route_errors import model_error_response
 
 from . import demo
+from .examples import PAPER_REPORT, PAPER_ORIGINAL, PAPER_REVISED, PAPER_NOTICE
 from .models import AdvanceRequest, ComparisonRequest, ComparisonView, Panel, PanelRequest, Report
 from .parsing import MAX_FILE_BYTES, ReportError, read_report
 from .repository import JuryRepository
@@ -60,6 +61,14 @@ def register_jury_routes(
     @router.get("/demo")
     def demo_example():
         return {"report_text": demo.REPORT, "original_text": demo.ORIGINAL, "revised_text": demo.REVISED,
+                "mode": provider.mode, "model": provider.model}
+
+    @router.get("/examples/{example_id}")
+    def example(example_id: str):
+        if example_id != "copier-paper":
+            raise HTTPException(404, "找不到这个数字人像测试样例。")
+        return {"report_text": PAPER_REPORT, "original_text": PAPER_ORIGINAL, "revised_text": PAPER_REVISED,
+                "filename": "复印纸-用户画像调研报告.txt", "notice": PAPER_NOTICE,
                 "mode": provider.mode, "model": provider.model}
 
     @router.post("/reports", status_code=201, response_model=Report)
