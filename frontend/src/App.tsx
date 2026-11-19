@@ -4,11 +4,12 @@ import { taskError, taskStage } from './lib/task-status'
 import type { Asset, DemoCase, Health, Page, Project, Review, Rewrite, Task } from './lib/types'
 import Setup from './pages/Setup'
 import ReviewPage from './pages/Review'
-import Icon, { type IconName } from './components/Icon'
+import ProjectPage from './pages/Project'
+import Icon from './components/Icon'
 
 const STORAGE = 'marketing-court-session-v1'
 
-function savedSession(): { page?: Page; reviewId?: string; taskId?: string } {
+function savedSession(): { page?: Page; projectId?: string; reviewId?: string; taskId?: string } {
   try {
     return JSON.parse(localStorage.getItem(STORAGE) ?? '{}')
   } catch {
@@ -18,11 +19,16 @@ function savedSession(): { page?: Page; reviewId?: string; taskId?: string } {
 
 export default function App() {
   const initial = useRef(savedSession())
-  const [page, setPage] = useState<Page>(initial.current.page === 'review' ? 'review' : 'setup')
+  const [page, setPage] = useState<Page>(
+    ['review', 'project'].includes(initial.current.page ?? '') ? initial.current.page! : 'setup',
+  )
+  const [projectId, setProjectId] = useState(initial.current.projectId ?? '')
   const [health, setHealth] = useState<Health | null>(null)
   const [projects, setProjects] = useState<Project[]>([])
   const [examples, setExamples] = useState<DemoCase[]>([])
-  const [history, setHistory] = useState<Review[]>([])
+  const [history, setHistory] = useState<Review[] | null>(null)
+  const [historyError, setHistoryError] = useState('')
+  const [historyReload, setHistoryReload] = useState(0)
   const [review, setReview] = useState<Review | null>(null)
   const [asset, setAsset] = useState<Asset | null>(null)
   const [selectedRisk, setSelectedRisk] = useState('')
@@ -46,6 +52,7 @@ export default function App() {
       versions.map((v) => api<Review>(`/api/reviews/${v.review_id}`)),
     )
     setReview(result)
+    setProjectId(result.project_id)
     setAsset(image)
     setRewrites(versions)
     setRechecks(Object.fromEntries(checks.map((c) => [c.review_id, c])))
@@ -71,13 +78,23 @@ export default function App() {
         setHealth(status)
         await refreshProjects()
         setExamples(await api<DemoCase[]>('/api/demo-cases'))
-        if (initial.current.reviewId) await loadReview(initial.current.reviewId)
+        if (initial.current.page === 'review' && initial.current.reviewId)
+          await loadReview(initial.current.reviewId)
         if (initial.current.taskId) {
           const task = await api<Task>(`/api/tasks/${initial.current.taskId}`)
           setTask(task)
-          if (task.kind === 'review' && task.status === 'completed' && task.result_id)
+          if (
+            initial.current.page === 'review' &&
+            task.kind === 'review' &&
+            task.status === 'completed' &&
+            task.result_id
+          )
             await loadReview(task.result_id)
-          else if (task.kind === 'review' && !initial.current.reviewId)
+          else if (
+            initial.current.page === 'review' &&
+            task.kind === 'review' &&
+            !initial.current.reviewId
+          )
             setAsset(await api<Asset>(`/api/assets/${task.resource_id}`))
         }
       } catch (e) {
@@ -97,11 +114,29 @@ export default function App() {
         STORAGE,
         JSON.stringify({
           page,
+          projectId,
           reviewId: review?.review_id,
           taskId: task?.task_id,
         }),
       )
-  }, [page, review, task, restored])
+  }, [page, projectId, review, task, restored])
+  useEffect(() => {
+    if (!projectId) return
+    let cancelled = false
+    setHistory(null)
+    setHistoryError('')
+    api<Review[]>(`/api/projects/${projectId}/reviews`)
+      .then((items) => {
+        if (!cancelled) setHistory(items)
+      })
+      .catch((e) => {
+        if (!cancelled)
+          setHistoryError(e instanceof Error ? e.message : '读取项目审核记录失败，请重试。')
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [projectId, review?.review_id, task?.status, historyReload])
   useEffect(() => {
     if (!task || !['queued', 'running'].includes(task.status)) return
     let stopped = false
@@ -132,6 +167,13 @@ export default function App() {
   }, [task?.task_id, task?.status, review?.review_id, loadReview, refreshProjects])
   const pending = Boolean(task && ['queued', 'running'].includes(task.status))
   const locked = Boolean(busy) || pending
+  const selectedProject = projects.find((p) => p.project_id === projectId)
+  const openProject = (id: string) => {
+    setProjectId(id)
+    setHistoryReload((value) => value + 1)
+    setPage('project')
+    setError('')
+  }
   const chooseReview = (id: string) =>
     action('读取审核版本', async () => {
       await loadReview(id)
@@ -149,6 +191,7 @@ export default function App() {
           href="#"
           onClick={(e) => {
             e.preventDefault()
+            setProjectId('')
             setPage('setup')
           }}
         >
@@ -162,22 +205,37 @@ export default function App() {
         </a>
         <p className="sidebar-label">工作空间</p>
         <nav aria-label="主导航">
-          {(
-            [
-              ['setup', 'folder', '项目与素材'],
-              ['review', 'scan', '审核工作台'],
-            ] as const
-          ).map(([key, icon, label]) => (
-            <button
-              key={key}
-              aria-current={page === key ? 'page' : undefined}
-              onClick={() => setPage(key)}
-            >
-              <Icon name={icon as IconName} />
-              {label}
-              <span className="nav-indicator" />
-            </button>
-          ))}
+          <button
+            aria-current={page === 'setup' && !projectId ? 'page' : undefined}
+            onClick={() => {
+              setProjectId('')
+              setPage('setup')
+            }}
+          >
+            <Icon name="folder" /> 项目与素材 <span className="nav-indicator" />
+          </button>
+          <div className="sidebar-project-heading">
+            我的项目 <span>{projects.length}</span>
+          </div>
+          <div className="sidebar-project-list" aria-label="我的项目">
+            {projects.map((project) => (
+              <button
+                key={project.project_id}
+                className="sidebar-project"
+                title={project.name}
+                aria-current={projectId === project.project_id ? 'page' : undefined}
+                disabled={locked}
+                onClick={() => openProject(project.project_id)}
+              >
+                <Icon name="file" size={17} />
+                <span className="sidebar-project-name">{project.name}</span>
+                <span className="nav-indicator" />
+              </button>
+            ))}
+            {projects.length === 0 && (
+              <p className="sidebar-project-empty">创建项目后会显示在这里</p>
+            )}
+          </div>
         </nav>
         <a className="jury-link" href="/jury" aria-label="消费者模拟（独立页面）">
           <Icon name="spark" size={18} />
@@ -188,7 +246,6 @@ export default function App() {
           <Icon name="shield" size={24} />
           <strong>让判断回到证据</strong>
           <p>定位广告宣称，追溯规则依据，对照改写与复核结果。</p>
-          <span>当前范围：英国环保文字宣称</span>
         </div>
         <div className="sidebar-bottom">
           <div>
@@ -205,7 +262,10 @@ export default function App() {
           <div className="breadcrumb">
             <span>本地工作空间</span>
             <Icon name="chevron" size={13} />
-            <strong>{page === 'setup' ? '项目与素材' : '审核工作台'}</strong>
+            <strong>
+              {selectedProject?.name ?? '项目与素材'}
+              {page === 'review' ? ' / 审核报告' : ''}
+            </strong>
           </div>
           <span className="mode-badge">
             <span className={`status-dot ${health ? 'online' : ''}`} />
@@ -263,14 +323,9 @@ export default function App() {
               health={health}
               projects={projects}
               examples={examples}
-              history={history}
+              key={projectId}
+              initialProjectId={projectId}
               busy={locked}
-              onProject={(id) =>
-                void action('读取历史', async () =>
-                  setHistory(await api<Review[]>(`/api/projects/${id}/reviews`)),
-                )
-              }
-              onOpen={(id) => void chooseReview(id)}
               onExample={(id) =>
                 void action('打开文案案例', async () => {
                   const r = await post<Review>(`/api/demo-cases/${id}`)
@@ -301,6 +356,7 @@ export default function App() {
                     method: 'POST',
                     body: data,
                   })
+                  setProjectId(p.project_id)
                   setAsset(a)
                   setReview(null)
                   setTask(null)
@@ -312,6 +368,17 @@ export default function App() {
               }
             />
           )}
+          {page === 'project' && selectedProject && (
+            <ProjectPage
+              project={selectedProject}
+              history={history}
+              error={historyError}
+              onRetry={() => setHistoryReload((value) => value + 1)}
+              busy={locked}
+              onOpen={(id) => void chooseReview(id)}
+              onAdd={() => setPage('setup')}
+            />
+          )}
           {page === 'review' && (
             <ReviewPage
               review={review}
@@ -321,7 +388,7 @@ export default function App() {
               rechecks={rechecks}
               busy={locked}
               onSelect={setSelectedRisk}
-              onSetup={() => setPage('setup')}
+              onSetup={() => setPage(selectedProject ? 'project' : 'setup')}
               onVersion={(id) => void chooseReview(id)}
               onRetryStart={() =>
                 asset &&

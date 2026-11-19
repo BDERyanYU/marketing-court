@@ -1,16 +1,14 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import Icon from '../components/Icon'
 import { markets, productCategories } from '../lib/project-options'
-import type { DemoCase, Health, Project, ProjectInput, Review } from '../lib/types'
+import type { DemoCase, Health, Project, ProjectInput } from '../lib/types'
 
 interface Props {
   health: Health | null
   projects: Project[]
   examples: DemoCase[]
-  history: Review[]
+  initialProjectId?: string
   busy: boolean
-  onProject: (id: string) => void
-  onOpen: (id: string) => void
   onDemo: () => void
   onExample: (id: string) => void
   onUpload: (project: ProjectInput, file: File | null, text: string, projectId?: string) => void
@@ -20,10 +18,8 @@ export default function Setup({
   health,
   projects,
   examples,
-  history,
+  initialProjectId = '',
   busy,
-  onProject,
-  onOpen,
   onDemo,
   onExample,
   onUpload,
@@ -32,7 +28,7 @@ export default function Setup({
   const [market, setMarket] = useState<ProjectInput['market']>('GB')
   const [productCategory, setProductCategory] =
     useState<ProjectInput['product_category']>('reusable_bottle')
-  const [projectId, setProjectId] = useState('')
+  const [projectId, setProjectId] = useState(initialProjectId)
   const [inputMode, setInputMode] = useState<'image' | 'text' | 'both'>('image')
   const [copy, setCopy] = useState('')
   const [file, setFile] = useState<File | null>(null)
@@ -375,48 +371,6 @@ export default function Setup({
           v1.2，未提供原图与商品页链接。示例判定不代表品牌违法或产品获准投放。
         </p>
       </section>
-      {projects.length > 0 && (
-        <section className="panel history-panel">
-          <div className="panel-title">
-            <div className="title-with-icon">
-              <Icon name="clock" />
-              <h2>已保存的项目</h2>
-              <span className="count-badge">{projects.length}</span>
-            </div>
-            <select
-              aria-label="选择历史项目"
-              defaultValue=""
-              onChange={(e) => onProject(e.target.value)}
-            >
-              <option value="" disabled>
-                选择项目查看版本
-              </option>
-              {projects.map((p) => (
-                <option key={p.project_id} value={p.project_id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="history-list">
-            {history.map((r) => (
-              <button key={r.review_id} onClick={() => onOpen(r.review_id)} disabled={busy}>
-                <span>
-                  {r.mode === 'demo' ? '预设案例' : '实时审核'} ·{' '}
-                  {new Date(r.created_at).toLocaleString('zh-CN')}
-                </span>
-                <strong>
-                  {r.coverage_status === 'unsupported'
-                    ? '未作风险判定'
-                    : `${r.risks.length} 项待核查`}
-                </strong>
-                <span>打开 ↗</span>
-              </button>
-            ))}
-            {history.length === 0 && <p className="muted">选择项目，继续查看已有审核记录。</p>}
-          </div>
-        </section>
-      )}
     </>
   )
 }

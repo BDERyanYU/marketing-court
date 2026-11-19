@@ -96,6 +96,7 @@ async function main() {
         uploaded = (request.headers()['content-type'] || '').includes('multipart/form-data') && request.postDataBuffer().includes(Buffer.from('eco-bottle.png'))
         return route.fulfill({ status: 201, json: { asset_version_id: 'upload-test-asset', project_id: 'upload-test-project', image_url: '/examples/eco-bottle.png', kind: 'image', original_filename: 'eco-bottle.png', width: 1000, height: 1200 } })
       }
+      if (endpoint === '/api/projects/upload-test-project/reviews') return route.fulfill({ json: [] })
       if (endpoint === '/api/assets/upload-test-asset/reviews') return route.fulfill({ status: 202, json: { task_id: 'upload-test-task', resource_id: 'upload-test-asset', kind: 'review', status: 'running', stage: 'asset_parsing' } })
       if (endpoint === '/api/tasks/upload-test-task') return route.fulfill({ json: { task_id: 'upload-test-task', resource_id: 'upload-test-asset', kind: 'review', status: 'interrupted', stage: 'asset_parsing', error: '界面验证任务，可以重试。' } })
       throw new Error(`Unexpected upload request: ${endpoint}`)

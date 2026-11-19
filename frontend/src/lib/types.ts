@@ -1,6 +1,6 @@
 import type { Market, ProductCategory } from './project-options'
 
-export type Page = 'setup' | 'review'
+export type Page = 'setup' | 'project' | 'review'
 export interface Health {
   status: string
   mode: 'demo' | 'live'
