@@ -17,7 +17,12 @@ def checked(response):
 def wait_task(client, task_id):
     deadline = time.monotonic() + 900
     while time.monotonic() < deadline:
-        task = checked(client.get(f"/api/tasks/{task_id}"))
+        try:
+            task = checked(client.get(f"/api/tasks/{task_id}"))
+        except httpx.TransportError:
+            # Polling is read-only; reconnect without creating another paid task.
+            time.sleep(1)
+            continue
         if task["status"] == "completed":
             return task["result_id"]
         if task["status"] in ("failed", "interrupted"):
