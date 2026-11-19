@@ -9,7 +9,7 @@ from .core.config import database_path_from_env, provider_from_env
 from .core.llm import ModelError, ModelProvider
 from .api.review import build_review_router
 from .core.store import Store
-from .services.ocr import PaddleOCRService
+from .services.ocr import ocr_from_env
 from .workflows.review import ReviewWorkflow
 from .jury.main import register_jury_routes
 from .api.workspace import build_workspace_router
@@ -26,7 +26,7 @@ def create_app(*, database_path: Path | None = None, provider: ModelProvider | N
     store = Store(path)
     storage = storage_path or Path(os.environ.get("STORAGE_DIR", str(path.parent / "uploads")))
     provider = provider if provider is not None else provider_from_env()
-    workflow = ReviewWorkflow(store, provider, ocr if ocr is not None else PaddleOCRService(), storage)
+    workflow = ReviewWorkflow(store, provider, ocr if ocr is not None else ocr_from_env(), storage)
 
     @asynccontextmanager
     async def lifespan(_app):

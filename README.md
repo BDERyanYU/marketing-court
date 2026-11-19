@@ -1,12 +1,34 @@
 # AI Marketing Court
 
-当前版本：**V2.1**，Git 标签 [`ui-v2.1`](https://github.com/BDERyanYU/marketing-court/tree/ui-v2.1)。版本说明见 [更新记录](CHANGELOG.md)。
+当前版本：**V2.2**（欢迎页与跨平台一键启动）。上一已标记版本 [`ui-v2.1`](https://github.com/BDERyanYU/marketing-court/tree/ui-v2.1) 保留。版本说明见 [更新记录](CHANGELOG.md)。
 
 当前整合版默认采用**第二版素材审核界面**，合入朋友分支的 TinyTroupe 原生画像派生、营销理论文件和消费者 A/B 并行评价。模拟法庭功能已移除。第三版圆桌工作区保留在 `?ui=v3`，第一版审核布局保留在 `?ui=v1`。
 
 完整能力：同一项目图片/文案/联合审核、PaddleOCR 文字坐标、DeepSeek 风险审核、英国 CMA 有限环保规则、改写与一次复核、独立版本、进度恢复、JSON 导出，以及调研报告驱动的消费者模拟。其他市场未接入规则时仅提取文字和宣称。
 
 ## 本机启动
+
+### 给朋友的一键启动（Windows / macOS）
+
+无需预装 Git、Python 或 Node.js。首次联网运行下面对应的一行命令，自动下载项目、安装组件并打开网页；首次按提示粘贴 DeepSeek 密钥即可，输入时不显示。后续双击桌面的 **Marketing Court**。关闭启动窗口即停止本机服务，项目和密钥留在该电脑，不写进 GitHub。
+
+Windows：打开 **PowerShell**，粘贴后回车：
+
+```powershell
+irm https://raw.githubusercontent.com/BDERyanYU/marketing-court/main/scripts/install-windows.ps1 | iex
+```
+
+macOS：打开 **终端**，粘贴后回车：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/BDERyanYU/marketing-court/main/scripts/install-macos.sh | /bin/bash
+```
+
+已下载项目的用户也可双击根目录的 `Start-Windows.cmd` 或 `Start-Mac.command`。Mac 如提示无执行权限，在终端执行 `bash Start-Mac.command`；下载安装入口会自动设置桌面快捷方式。
+
+审核和数字人像测试统一使用 `deepseek-flash`，启动前检查密钥和模型是否可用。首次运行会安装并验证 OCR，可能耗时较长；默认使用 PaddleOCR，Intel Mac（macOS 13+）以及 Windows 中文等非 ASCII 安装路径使用兼容的 ONNX OCR。这里只是本机运行，不会发布公网网站，也不会将模型密钥放到网页中。安装位置、重试与更新见 [一键启动说明](docs/one-click-start.md)。
+
+### 手动开发启动
 
 需要 Python 3.12+、uv 和 Node.js 20+。
 

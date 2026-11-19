@@ -51,7 +51,7 @@ class TextAnchor(StrictModel):
     text: str
     polygon: list[tuple[float, float]] = Field(min_length=4, max_length=4)
     score: float = Field(ge=0, le=1)
-    method: Literal["paddleocr", "fixture"]
+    method: Literal["paddleocr", "rapidocr", "fixture"]
 
 
 class ExtractedClaim(StrictModel):
