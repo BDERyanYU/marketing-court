@@ -15,9 +15,10 @@ export default function AssetCanvas({
 }) {
   const container = useRef<HTMLDivElement>(null)
   useEffect(() => {
-    container.current
-      ?.querySelector('[data-selected="true"]')
-      ?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    container.current?.querySelector('[data-selected="true"]')?.scrollIntoView({
+      behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+      block: 'nearest',
+    })
   }, [selectedRisk])
   return (
     <div className="asset-scroll" ref={container}>

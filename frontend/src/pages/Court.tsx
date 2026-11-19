@@ -1,4 +1,5 @@
 import type { CourtCase } from '../lib/types'
+import Icon from '../components/Icon'
 
 const dispositions: Record<string, string> = {
   upheld: '维持风险意见',
@@ -40,11 +41,13 @@ export default function Court({
   if (!court)
     return (
       <div className="empty-state">
-        <span>03 / COURT</span>
+        <span className="empty-icon">
+          <Icon name="scales" size={34} />
+        </span>
         <h1>让争议回到证据。</h1>
         <p>从审核工作台选择一条风险，提出异议后开启庭审。</p>
         <button className="primary" onClick={onBack}>
-          返回审核工作台 ↗
+          返回审核工作台 <Icon name="arrow" size={17} />
         </button>
       </div>
     )
@@ -52,17 +55,22 @@ export default function Court({
     <>
       <div className="page-heading compact">
         <div>
-          <p className="eyebrow">THE COURT OF EVIDENCE</p>
           <h1>观点可以交锋，证据必须可查。</h1>
           <p className="intro">两轮控辩 · 独立法官复核 · 案件进度自动保存</p>
         </div>
         <button className="secondary" onClick={onBack}>
-          ← 返回审核
+          <Icon name="back" size={17} />
+          返回审核
         </button>
       </div>
       <div className="court-grid">
         <aside className="panel case-file">
-          <p className="eyebrow">CASE FILE / 案卷</p>
+          <div className="case-heading">
+            <span className="title-icon">
+              <Icon name="folder" />
+            </span>
+            <strong>案件档案</strong>
+          </div>
           <span className="small-tag">
             {court.mode === 'demo' ? '固定发言演示' : '实时模型发言'}
           </span>
@@ -87,6 +95,24 @@ export default function Court({
           </small>
         </aside>
         <section className="court-timeline">
+          <ol className="court-progress" aria-label="庭审进度">
+            {Object.entries(steps).map(([key, label], index) => {
+              const completed =
+                key === 'judgment'
+                  ? Boolean(court.judgment)
+                  : court.turns.some((turn) => turn.step === key)
+              return (
+                <li
+                  key={key}
+                  className={completed ? 'done' : court.next_step === key ? 'current' : ''}
+                  aria-current={court.next_step === key ? 'step' : undefined}
+                >
+                  <span>{completed ? <Icon name="check" size={14} /> : index + 1}</span>
+                  <small>{label.replace(' · ', '')}</small>
+                </li>
+              )
+            })}
+          </ol>
           <div className="court-controls">
             <div>
               <span className="status-dot online" />
@@ -105,14 +131,17 @@ export default function Court({
                   {auto ? '暂停后续发言' : '自动完成庭审'}
                 </button>
                 <button className="primary" disabled={busy || auto} onClick={onAdvance}>
-                  {busy ? '生成中…' : '推进下一步 ↗'}
+                  {busy ? '生成中…' : '推进下一步'}
+                  {!busy && <Icon name="arrow" size={16} />}
                 </button>
               </div>
             )}
           </div>
           {court.turns.length === 0 && (
             <div className="timeline-empty">
-              <span>§</span>
+              <span>
+                <Icon name="scales" size={39} />
+              </span>
               <h3>案卷已建立</h3>
               <p>选择逐步推进，或自动完成两轮控辩与裁判。</p>
             </div>
@@ -124,7 +153,7 @@ export default function Court({
                 <div className="turn-header">
                   <h3>{turn.role === 'prosecutor' ? '控方' : '辩方律师'}</h3>
                   <span>
-                    ROUND {turn.round} · {positions[turn.position]}
+                    第 {turn.round} 轮 · {positions[turn.position]}
                   </span>
                 </div>
                 <p>{turn.argument}</p>
@@ -148,7 +177,14 @@ export default function Court({
           ))}
           {court.judgment && (
             <article className="judgment">
-              <p className="eyebrow">INDEPENDENT REVIEW / 独立复核</p>
+              <div className="judgment-label">
+                <Icon name="scales" size={19} />
+                <span>独立法官复核</span>
+                <span className="judgment-saved">
+                  <Icon name="check" size={14} />
+                  已保存
+                </span>
+              </div>
               <h2>{dispositions[court.judgment.disposition]}</h2>
               <p>{court.judgment.reason}</p>
               <div className="citation-tags">

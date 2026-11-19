@@ -1,0 +1,10 @@
+:root {
+  --canvas: #f3f6fa;
+  --navy: #182f47;
+  --blue: #355f98;
+  --ink: #2f465d;
+  --muted: #74889b;
+  --line: #dfe6ee;
+  --sidebar-width: 242px;
+  --font-body: 'Microsoft YaHei UI', 'Microsoft YaHei', 'PingFang SC', 'Noto Sans SC', sans-serif;
+}

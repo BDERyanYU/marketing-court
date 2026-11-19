@@ -1,4 +1,6 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
+import Icon from '../components/Icon'
+import BottleArt from '../components/BottleArt'
 import type { Health, Project, ProjectInput, Review } from '../lib/types'
 
 interface Props {
@@ -29,6 +31,16 @@ export default function Setup({
   const [file, setFile] = useState<File | null>(null)
   const [fileError, setFileError] = useState('')
   const [dragging, setDragging] = useState(false)
+  const [preview, setPreview] = useState('')
+  useEffect(() => {
+    if (!file) {
+      setPreview('')
+      return
+    }
+    const url = URL.createObjectURL(file)
+    setPreview(url)
+    return () => URL.revokeObjectURL(url)
+  }, [file])
   const choose = (chosen?: File) => {
     if (!chosen) return
     if (!['image/png', 'image/jpeg'].includes(chosen.type) || chosen.size > 10 * 1024 * 1024) {
@@ -46,31 +58,50 @@ export default function Setup({
     <>
       <div className="page-heading">
         <div>
-          <p className="eyebrow">EVIDENCE BEFORE OPINION</p>
-          <h1>
-            让每一句宣称，
-            <br />
-            都有据可循<span>。</span>
-          </h1>
-          <p className="intro">
-            从一张广告开始，识别需要证据支持的表达，
-            <br className="desktop-only" />
-            用可追溯的规则与复核，让讨论更清晰。
-          </p>
+          <h1>让每一句宣称，都有据可循。</h1>
+          <p className="intro">从广告素材到规则依据，再到控辩复核。让营销判断多一份证据。</p>
         </div>
-        <div className="chapter-number">
-          01
-          <span>
-            PROJECT
-            <br />& ASSET
-          </span>
-        </div>
+        <span className="page-scope">
+          <Icon name="shield" size={17} />
+          英国环保宣称审核
+        </span>
       </div>
+      <ol className="workflow-strip" aria-label="审核流程">
+        <li className="current">
+          <span>1</span>
+          <div>
+            <strong>上传广告素材</strong>
+            <small>从一张图片开始</small>
+          </div>
+        </li>
+        <li>
+          <span>2</span>
+          <div>
+            <strong>发现风险与依据</strong>
+            <small>原图定位，规则可查</small>
+          </div>
+        </li>
+        <li>
+          <span>3</span>
+          <div>
+            <strong>改写或提出异议</strong>
+            <small>复核文案，开启庭审</small>
+          </div>
+        </li>
+      </ol>
       <div className="setup-grid">
         <form className="panel upload-panel" onSubmit={submit}>
           <div className="panel-title">
-            <h2>创建一次审核</h2>
-            <span className="small-tag">文字宣称审核</span>
+            <div className="title-with-icon">
+              <span className="title-icon">
+                <Icon name="folder" />
+              </span>
+              <div>
+                <h2>创建一次审核</h2>
+                <p>设置项目，并添加你的广告图片</p>
+              </div>
+            </div>
+            <span className="small-tag">新项目</span>
           </div>
           <label className="field-label" htmlFor="project-name">
             项目名称
@@ -114,7 +145,7 @@ export default function Setup({
             当前可选范围：英国市场、日用消费品 · 水杯。环保宣称规则已接入，更多市场与品类待扩展。
           </p>
           <label
-            className={`dropzone ${dragging ? 'dragging' : ''}`}
+            className={`dropzone ${dragging ? 'dragging' : ''} ${file ? 'has-file' : ''}`}
             onDragOver={(e) => {
               e.preventDefault()
               setDragging(true)
@@ -132,7 +163,13 @@ export default function Setup({
               aria-label="选择广告图片"
               onChange={(e) => choose(e.target.files?.[0])}
             />
-            <span className="upload-icon">↥</span>
+            {preview ? (
+              <img className="upload-preview" src={preview} alt="已选广告图片预览" />
+            ) : (
+              <span className="upload-icon">
+                <Icon name="upload" size={25} />
+              </span>
+            )}
             <strong>{file ? file.name : '将广告图片拖到这里'}</strong>
             <span>
               {file ? `${(file.size / 1024).toFixed(0)} KB · 点击更换` : '或点击选择本地文件'}
@@ -145,7 +182,8 @@ export default function Setup({
             </p>
           )}
           <p className="privacy-note">
-            文件保存在本机。实时审核会将提取的广告文字发送至 DeepSeek；密钥仅保存在服务端。
+            <Icon name="shield" size={15} />
+            图片保存在本机；实时审核会将识别出的广告文字发送给 DeepSeek。
           </p>
           <button
             className="primary wide"
@@ -153,46 +191,66 @@ export default function Setup({
             disabled={busy || !file || !name.trim() || health?.mode !== 'live'}
           >
             {busy ? '正在处理…' : '上传并开始审核'}
-            <span>↗</span>
+            <Icon name="arrow" size={18} />
           </button>
           {health?.mode !== 'live' && (
             <p className="muted small">
-              当前为固定演示模式，请打开右侧预设案例；实时上传需先配置模型。
+              当前为固定演示模式，可先打开预设案例。启用实时模型后可审核新素材。
             </p>
           )}
         </form>
         <div className="setup-right">
           <section className="demo-card">
-            <p className="eyebrow">A CASE TO EXPLORE</p>
-            <div className="bottle-illustration" aria-hidden="true">
-              <div />
+            <div className="demo-card-heading">
+              <span className="small-tag">预设案例</span>
+              <span>英国 CMA 环保指引</span>
             </div>
-            <span className="small-tag">英国 CMA · 环保宣称</span>
             <h2>
-              100%
+              一只水杯，
               <br />
-              <em>Eco-Friendly.</em>
+              一句值得追问的承诺。
             </h2>
             <p>
-              一个看似简单的承诺，
+              “100% 环保”的背后，
               <br />
               需要多大范围的证据支持？
             </p>
-            <button className="secondary" disabled={busy || !health} onClick={onDemo}>
-              打开预设案例 <span>↗</span>
-            </button>
-            <small>使用人工准备的文字、坐标与审核结果，界面明确标注。</small>
+            <BottleArt />
+            <div className="demo-card-bottom">
+              <div>
+                <strong>体验完整审核流程</strong>
+                <span>无需准备素材</span>
+              </div>
+              <button
+                className="demo-open"
+                aria-label="打开预设案例"
+                disabled={busy || !health}
+                onClick={onDemo}
+              >
+                打开预设案例 <Icon name="arrow" size={18} />
+              </button>
+            </div>
+            <small>案例文字、坐标与审核结果为人工预设。</small>
           </section>
           <section className="scope-note">
-            <span>本次审核范围</span>
-            <p>英国普通消费品环保文字宣称。其他市场、视觉暗示与平台专项政策需要另行审核。</p>
+            <Icon name="file" size={21} />
+            <div>
+              <h3>先聚焦文字，让证据说话</h3>
+              <p>
+                当前覆盖英国普通消费品的环保文字宣称。图片视觉暗示、其他市场与平台政策需另行审核。
+              </p>
+            </div>
           </section>
         </div>
       </div>
       {projects.length > 0 && (
         <section className="panel history-panel">
           <div className="panel-title">
-            <h2>已保存的项目</h2>
+            <div className="title-with-icon">
+              <Icon name="clock" />
+              <h2>已保存的项目</h2>
+              <span className="count-badge">{projects.length}</span>
+            </div>
             <select
               aria-label="选择历史项目"
               defaultValue=""

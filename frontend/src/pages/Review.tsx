@@ -1,4 +1,5 @@
 import AssetCanvas from '../components/AssetCanvas'
+import Icon from '../components/Icon'
 import { resourceUrl } from '../lib/api'
 import type { Asset, Review as ReviewData, Rewrite } from '../lib/types'
 
@@ -33,11 +34,13 @@ export default function Review({
   if (!asset)
     return (
       <div className="empty-state">
-        <span>02 / REVIEW</span>
+        <span className="empty-icon">
+          <Icon name="scan" size={32} />
+        </span>
         <h1>从一份素材开始</h1>
         <p>上传广告或打开预设案例，查看风险与证据。</p>
         <button className="primary" onClick={onSetup}>
-          选择素材 ↗
+          选择素材 <Icon name="arrow" size={17} />
         </button>
       </div>
     )
@@ -45,7 +48,6 @@ export default function Review({
     <>
       <div className="page-heading compact">
         <div>
-          <p className="eyebrow">REVIEW WORKSPACE</p>
           <h1>每项风险，都能追溯。</h1>
           <p className="intro">
             英国 · 日用消费品 · 环保宣称{asset.kind === 'copy' ? ' · 改写文案版本' : ''}
@@ -57,19 +59,44 @@ export default function Review({
             href={resourceUrl(`/api/reviews/${review.review_id}/report`)}
             download
           >
-            导出 JSON 报告 ↓
+            <Icon name="download" size={17} />
+            导出 JSON 报告
           </a>
         )}
       </div>
       {review?.mode === 'demo' && (
         <div className="notice">
-          预设案例 / 文字、坐标与审核结果由人工准备；庭审发言按服务当前模式生成。
+          <Icon name="file" size={17} />
+          <span>预设案例：文字、坐标与审核结果由人工准备；庭审发言按服务当前模式生成。</span>
+        </div>
+      )}
+      {review && (
+        <div className="review-summary">
+          <span>
+            <Icon name="file" size={17} />
+            {asset.original_filename}
+          </span>
+          <span>
+            <i className="summary-dot risk-dot" />
+            {review.risks.length} 项待核查
+          </span>
+          <span>
+            <Icon name="shield" size={16} />
+            {review.sources.length} 条规则依据
+          </span>
+          <span className="save-status">
+            <Icon name="check" size={16} />
+            审核结果已保存
+          </span>
         </div>
       )}
       <div className="review-grid">
         <section className="panel asset-panel">
           <div className="panel-title">
-            <h2>{asset.kind === 'copy' ? '关联原图' : '原始素材'}</h2>
+            <div className="title-with-icon">
+              <Icon name="scan" size={20} />
+              <h2>{asset.kind === 'copy' ? '关联原图' : '原始素材'}</h2>
+            </div>
             <span className="small-tag">
               {asset.width} × {asset.height}
             </span>
@@ -111,7 +138,11 @@ export default function Review({
                 id={risk.risk_id}
                 className={`risk-card ${selectedRisk === risk.risk_id ? 'active' : ''}`}
               >
-                <button className="risk-select" onClick={() => onSelect(risk.risk_id)}>
+                <button
+                  className="risk-select"
+                  aria-pressed={selectedRisk === risk.risk_id}
+                  onClick={() => onSelect(risk.risk_id)}
+                >
                   <span className={`severity ${risk.severity}`}>
                     {risk.severity === 'high'
                       ? '高风险'
@@ -164,7 +195,7 @@ export default function Review({
                     disabled={busy}
                     onClick={() => onAppeal(risk.risk_id)}
                   >
-                    提出异议 ↗
+                    提出异议 <Icon name="scales" size={17} />
                   </button>
                 </div>
               </article>
@@ -186,11 +217,11 @@ export default function Review({
           </div>
           <div className="copy-comparison">
             <div>
-              <p className="eyebrow">ORIGINAL / 原文</p>
+              <p className="copy-label">原始文案</p>
               <p>{w.original_text}</p>
             </div>
             <div>
-              <p className="eyebrow">REVISION / 建议文案</p>
+              <p className="copy-label">建议文案</p>
               <p>{w.revised_text}</p>
             </div>
           </div>

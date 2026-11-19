@@ -4,6 +4,7 @@ import type { Asset, CourtCase, Health, Page, Project, Review, Rewrite, Task } f
 import Setup from './pages/Setup'
 import ReviewPage from './pages/Review'
 import Court from './pages/Court'
+import Icon, { type IconName } from './components/Icon'
 
 const STORAGE = 'marketing-court-session-v1'
 const stages: Record<string, string> = {
@@ -182,6 +183,9 @@ export default function App() {
     })
   return (
     <div className="app-layout">
+      <a className="skip-link" href="#main-content">
+        跳到主要内容
+      </a>
       <aside className="sidebar">
         <a
           className="brand"
@@ -192,60 +196,70 @@ export default function App() {
           }}
         >
           <span className="brand-symbol">
-            M<span>·</span>C
+            <Icon name="scales" size={27} />
           </span>
-          <span>
-            MARKETING
-            <br />
-            <strong>COURT</strong>
+          <span className="brand-name">
+            <strong>AI 营销法庭</strong>
+            <span>Marketing Court</span>
           </span>
         </a>
-        <p className="sidebar-label">工作空间 / WORKSPACE</p>
+        <p className="sidebar-label">工作空间</p>
         <nav aria-label="主导航">
           {(
             [
-              ['setup', '01', '项目与素材'],
-              ['review', '02', '审核工作台'],
-              ['court', '03', '模拟法庭'],
+              ['setup', 'folder', '项目与素材'],
+              ['review', 'scan', '审核工作台'],
+              ['court', 'scales', '模拟法庭'],
             ] as const
-          ).map(([key, num, label]) => (
+          ).map(([key, icon, label]) => (
             <button
               key={key}
               aria-current={page === key ? 'page' : undefined}
               onClick={() => setPage(key)}
             >
-              <span>{num}</span>
+              <Icon name={icon as IconName} />
               {label}
-              <i>↗</i>
+              <span className="nav-indicator" />
             </button>
           ))}
         </nav>
-        <a className="text-button" style={{ marginTop: 20 }} href="/jury">
-          消费者模拟（独立页面） ↗
+        <a className="jury-link" href="/jury" aria-label="消费者模拟（独立页面）">
+          <Icon name="spark" size={18} />
+          <span>消费者模拟</span>
+          <Icon name="external" size={14} />
         </a>
+        <div className="workspace-note">
+          <Icon name="shield" size={24} />
+          <strong>让判断回到证据</strong>
+          <p>定位广告宣称，追溯规则依据，在控辩中重新审视风险。</p>
+          <span>当前范围：英国环保文字宣称</span>
+        </div>
         <div className="sidebar-bottom">
-          <span className={`status-dot ${health ? 'online' : ''}`} />
-          {health ? '本地服务已连接' : '连接本地服务中'}
-          <p>
-            英国 · 环保文字宣称
-            <br />
-            DEMO RELEASE / 01
-          </p>
+          <div>
+            <span className={`status-dot ${health ? 'online' : ''}`} />
+            {health ? '本地服务已连接' : '连接本地服务中'}
+          </div>
+          <a href="/?ui=v1">
+            查看第一版 <Icon name="external" size={13} />
+          </a>
         </div>
       </aside>
       <div className="workspace">
         <header className="topbar">
-          <span>
-            AI Marketing Court{' '}
-            <span className="muted">
-              / {page === 'setup' ? '项目与素材' : page === 'review' ? '审核工作台' : '模拟法庭'}
-            </span>
-          </span>
+          <div className="breadcrumb">
+            <span>本地工作空间</span>
+            <Icon name="chevron" size={13} />
+            <strong>
+              {page === 'setup' ? '项目与素材' : page === 'review' ? '审核工作台' : '模拟法庭'}
+            </strong>
+          </div>
           <span className="mode-badge">
-            {health?.mode === 'live' ? '实时模型' : '固定演示'} · {health?.model ?? '等待连接'}
+            <span className={`status-dot ${health ? 'online' : ''}`} />
+            {health ? (health.mode === 'live' ? '实时模型' : '固定演示') : '等待连接'}
+            {health && <span className="model-name">{health.model}</span>}
           </span>
         </header>
-        <main>
+        <main id="main-content">
           {error && (
             <div className="error-banner" role="alert">
               <span>{error}</span>
@@ -266,7 +280,9 @@ export default function App() {
                 </strong>
                 <p>
                   {task.error ??
-                    (task.status === 'completed' ? '结果已保存。' : '进度来自后端实际执行状态。')}
+                    (task.status === 'completed'
+                      ? '结果已保存。'
+                      : '处理进度会自动更新，你可以留在此页等待。')}
                 </p>
               </div>
               {['failed', 'interrupted'].includes(task.status) ? (
@@ -379,8 +395,14 @@ export default function App() {
           )}
         </main>
         <footer>
-          AI 辅助审核与非正式风险复核，不构成法律意见或投放批准。
-          <span>证据可追溯 · 版本可回溯</span>
+          <span>
+            <Icon name="shield" size={14} />
+            AI 辅助审核与模拟庭审，不构成法律意见或投放批准。
+          </span>
+          <a className="mobile-version-link" href="/?ui=v1">
+            查看第一版
+          </a>
+          <span className="footer-wordmark">Marketing Court</span>
         </footer>
       </div>
     </div>
