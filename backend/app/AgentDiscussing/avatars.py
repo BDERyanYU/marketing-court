@@ -4,7 +4,7 @@ from random import Random
 from moot.core import MODERATOR_ID, Persona
 
 
-# Each index identifies a low-poly roundtable model in the frontend catalog.
+# Each index identifies a cell in the four-by-four original portrait sheet.
 PORTRAIT_COUNT = 16
 
 

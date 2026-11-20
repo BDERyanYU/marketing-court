@@ -2,8 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react'
 import Icon from '../components/Icon'
 import { api, post } from '../lib/api'
 import InviteePicker from './InviteePicker'
-import Portrait from './Portrait'
-import Stage from './Stage'
+import Stage, { Portrait } from './Stage'
 import type { Discussion, InviteeReference, Risk, Source, Turn } from './types'
 import { speakerName, speech } from './types'
 import './roundtable.css'
@@ -269,7 +268,12 @@ export default function Roundtable({
                               >
                                 <Portrait index={discussion.avatar_indices[value.speaker_id]} />
                                 <span>
-                                  <strong>{speakerName(value)}</strong>
+                                  <strong>
+                                    {speakerName(value)}
+                                    {value.speaker_id === discussion.issue.invitee?.member_id && (
+                                      <small>数字人像</small>
+                                    )}
+                                  </strong>
                                   <span>{speech(value.text)}</span>
                                 </span>
                               </button>

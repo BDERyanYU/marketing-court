@@ -1,5 +1,4 @@
 import { useState, type CSSProperties, type ReactNode } from 'react'
-import Portrait from './Portrait'
 import type { Discussion, Persona, Turn } from './types'
 import { speakerName, speech } from './types'
 
@@ -18,9 +17,19 @@ function xy(index: number, total: number) {
   return { x, y: 64 + Math.abs(x - 50) * 0.26 }
 }
 
-function seatFacing(x: number) {
-  const offset = (50 - x) / 35
-  return Math.round(Math.sign(offset) * Math.abs(offset) ** 1.5 * 40)
+export function Portrait({ index, className = '' }: { index?: number; className?: string }) {
+  if (index === undefined)
+    return <span className={`rt-portrait rt-portrait-empty ${className}`} aria-hidden="true" />
+  return (
+    <span
+      aria-hidden="true"
+      className={`rt-portrait ${className}`}
+      data-portrait-index={index}
+      style={{
+        backgroundPosition: `${(index % 4) * (100 / 3)}% ${Math.floor(index / 4) * (100 / 3)}%`,
+      }}
+    />
+  )
 }
 
 export default function Stage({
@@ -35,7 +44,6 @@ export default function Stage({
   const [hovered, setHovered] = useState<string | null>(null)
   const [focused, setFocused] = useState<string | null>(null)
   const [pinned, setPinned] = useState<string | null>(null)
-  const [previewYaw, setPreviewYaw] = useState(0)
   const seats = discussion ? [HOST, ...discussion.participants] : []
   const selected = seats.find((seat) => seat.id === (hovered ?? focused ?? pinned))
   const speakerIndex = seats.findIndex((seat) => seat.id === turn?.speaker_id)
@@ -83,16 +91,9 @@ export default function Stage({
               if (event.currentTarget.matches(':focus-visible')) setFocused(seat.id)
             }}
             onBlur={() => setFocused(null)}
-            onClick={() => {
-              setPinned((previous) => (previous === seat.id ? null : seat.id))
-              setPreviewYaw(0)
-            }}
+            onClick={() => setPinned((previous) => (previous === seat.id ? null : seat.id))}
           >
-            <Portrait
-              index={discussion?.avatar_indices[seat.id]}
-              yaw={seatFacing(x)}
-              size="table"
-            />
+            <Portrait index={discussion?.avatar_indices[seat.id]} />
             <span className="rt-nameplate">
               <strong>{seat.name}</strong>
               <small>{seat.role}</small>
@@ -125,31 +126,6 @@ export default function Stage({
               </button>
             )}
           </div>
-          {pinned === selected.id && (
-            <div className="rt-persona-model">
-              <Portrait
-                index={discussion?.avatar_indices[selected.id]}
-                yaw={previewYaw}
-                size="preview"
-              />
-              <div className="rt-persona-angles" role="group" aria-label="人像角度">
-                <button
-                  type="button"
-                  aria-pressed={previewYaw === 0}
-                  onClick={() => setPreviewYaw(0)}
-                >
-                  正面
-                </button>
-                <button
-                  type="button"
-                  aria-pressed={previewYaw === 75}
-                  onClick={() => setPreviewYaw(75)}
-                >
-                  侧面
-                </button>
-              </div>
-            </div>
-          )}
           <dl>
             {[
               ['立场', selected.viewpoint],

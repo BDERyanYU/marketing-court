@@ -7,7 +7,7 @@ async function main() {
   const url = process.env.APP_URL || 'http://127.0.0.1:5173'
   const output = process.env.BROWSER_OUTPUT_DIR || 'test-results/roundtable'
   const browser = await chromium.launch({ executablePath: process.env.BROWSER_PATH, headless: true })
-  const context = await browser.newContext({ viewport: { width: 1536, height: 920 } })
+  const context = await browser.newContext({ viewport: { width: 1672, height: 941 } })
   const page = await context.newPage()
   const errors = []
   page.on('pageerror', (e) => errors.push(e.message))
@@ -56,25 +56,16 @@ async function main() {
     fs.mkdirSync(output, { recursive: true })
     await page.waitForFunction(() => Number(getComputedStyle(document.querySelector('.rt-light')).opacity) >= 0.99)
     await page.screenshot({ path: path.join(output, 'roundtable-desktop.png') })
-    assert.equal(await dialog.locator('[data-seat-id] canvas').count(), 4, 'every seat must render geometry')
-    const seatAngles = await dialog.locator('[data-seat-id] canvas').evaluateAll((models) =>
-      models.map((model) => Number(model.dataset.yaw)))
-    assert.ok(seatAngles.some((angle) => Math.abs(angle) >= 30), 'outer seats should show a side view')
-    assert.ok(seatAngles.some((angle) => Math.abs(angle) <= 12), 'inner seats should show a front view')
+    const portraits = dialog.locator('[data-seat-id] [data-portrait-index]')
+    assert.equal(await portraits.count(), 4)
+    assert.ok(await (await page.request.get(url + '/roundtable/portraits.png')).ok())
+    assert.ok(await portraits.evaluateAll((entries) => entries.every(
+      (entry) => getComputedStyle(entry).backgroundImage.includes('/roundtable/portraits.png'),
+    )))
 
     await other.click()
-    const model = dialog.locator('.rt-persona-model canvas')
-    const format = await model.evaluate((canvas) => {
-      const pixels = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data
-      return { image: canvas.toDataURL(), painted: pixels.some((value, index) => index % 4 === 3 && value > 0) }
-    })
-    assert.equal(format.painted, true)
-    await model.screenshot({ path: path.join(output, 'portrait-front.png') })
-    await dialog.getByRole('button', { name: '侧面', exact: true }).click()
-    assert.notEqual(await model.evaluate((canvas) => canvas.toDataURL()), format.image)
-    assert.equal(await model.getAttribute('data-yaw'), '75')
-    assert.deepEqual(await other.boundingBox(), beforeHover)
-    await model.screenshot({ path: path.join(output, 'portrait-side.png') })
+    assert.equal(await dialog.locator('.rt-persona [data-portrait-index]').getAttribute('data-portrait-index'),
+      await other.locator('[data-portrait-index]').getAttribute('data-portrait-index'))
     await dialog.getByRole('button', { name: '关闭人设' }).click()
 
     await page.mouse.move(10, 10)
@@ -117,7 +108,7 @@ async function main() {
     await jury.getByText('数字人像已保存，可以填写两版文案。', { exact: true }).waitFor()
     await jury.close()
 
-    await page.setViewportSize({ width: 1536, height: 920 })
+    await page.setViewportSize({ width: 1672, height: 941 })
     await dialog.getByRole('button', { name: '发起新讨论' }).click()
     const member = panel.members[1]
     const chooser = dialog.getByLabel('邀请数字人像（可选）')
@@ -131,10 +122,12 @@ async function main() {
     const saved = await (await page.request.get(url + '/api/discussions/' + meeting.discussion_id)).json()
     const guest = saved.participants.find((participant) => participant.id === member.member_id)
     assert.equal(guest.name, member.specification.persona.name)
-    assert.equal(await dialog.locator('[data-seat-id] canvas').count(), 5)
+    assert.equal(await portraits.count(), 5)
     assert.equal(new Set(Object.values(saved.avatar_indices)).size, 5)
     const guestSeat = dialog.locator(`[data-seat-id="${guest.id}"][data-invited="true"]`)
     await guestSeat.getByText('受邀数字人像').waitFor()
+    assert.equal(Number(await guestSeat.locator('[data-portrait-index]').getAttribute('data-portrait-index')),
+      saved.avatar_indices[guest.id])
     const guestTurn = saved.turns.findIndex((value) => value.speaker_id === guest.id)
     assert.ok(guestTurn > 0, 'the selected persona has a real discussion turn')
     if (await firstRound.getAttribute('aria-expanded') === 'false') await firstRound.click()
@@ -145,6 +138,11 @@ async function main() {
     await dialog.getByRole('complementary', { name: guest.name + ' 的人设' }).waitFor()
     await page.waitForFunction(() => Number(getComputedStyle(document.querySelector('.rt-light')).opacity) >= 0.99)
     await page.screenshot({ path: path.join(output, 'roundtable-invited.png') })
+
+    await page.setViewportSize({ width: 650, height: 840 })
+    const plates = await dialog.locator('.rt-nameplate').evaluateAll((labels) =>
+      labels.map((label) => label.getBoundingClientRect().toJSON()))
+    assert.ok(plates.every((plate, index) => !index || plates[index - 1].right <= plate.left + 1))
 
     await page.setViewportSize({ width: 390, height: 844 })
     await dialog.locator('.rt-main').evaluate((main) => { main.scrollTop = 0 })
@@ -158,7 +156,7 @@ async function main() {
     await guestSeat.waitFor()
     assert.equal(await dialog.locator('[data-seat-id]').count(), 5)
     assert.deepEqual(errors, [])
-    console.log('Passed: risk launch, 3D front and side views, stable seating and hover, invite a saved digital persona, five seats, spotlight, one speech bubble, rounds, memo, mobile and reopen.')
+    console.log('Passed: original portraits, stable seating and hover, invite a saved digital persona, five seats, spotlight, one speech bubble, rounds, memo, mobile and reopen.')
   } finally {
     await browser.close()
   }

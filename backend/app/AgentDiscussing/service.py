@@ -59,6 +59,7 @@ class DiscussionService:
             context = DiscussionContext(
                 issue=issue, mode=self.provider.provider.mode,
                 rationale=proposal.rationale, balance_notes=proposal.balance_notes,
+                invitee_name=guest[1].name if guest is not None else None,
             )
             moderator = AIModerator()
             agents = proposal.agents.copy()
@@ -115,13 +116,24 @@ def view(state: SessionState) -> DiscussionView:
     reason = "error" if state.end_reason == "completed" and not state.report else state.end_reason
     allowed = {source.source_id for source in context.issue.sources}
     report = visible_citations(state.report, allowed) if state.report else None
+    display_names = {}
+    if context.issue.invitee is not None and context.invitee_name is not None:
+        display_names[str(context.issue.invitee.member_id)] = context.invitee_name
+    participants = [
+        dict(
+            agent.model_dump(mode="json", exclude={"model", "knowledge", "tools", "prompt_override"}),
+            name=display_names.get(agent.id, agent.name),
+        )
+        for agent in state.config.agents
+    ]
     turns = []
     for message in state.messages:
         if message.speaker_kind is SpeakerKind.SYSTEM:
             continue
         text = visible_citations(message.text, allowed)
         turns.append(DiscussionTurn(
-            speaker_id=message.speaker_id, speaker_name=state.config.speaker_label(message.speaker_id),
+            speaker_id=message.speaker_id,
+            speaker_name=display_names.get(message.speaker_id, state.config.speaker_label(message.speaker_id)),
             speaker_kind=message.speaker_kind.value, round_index=message.round_index,
             text=text, source_ids=citation_ids(text),
         ))
@@ -129,8 +141,7 @@ def view(state: SessionState) -> DiscussionView:
     return DiscussionView(
         discussion_id=state.id, issue=context.issue, mode=context.mode, model=state.config.default_model.model,
         status=state.status.value, end_reason=reason, created_at=state.created_at,
-        participants=[agent.model_dump(mode="json", exclude={"model", "knowledge", "tools", "prompt_override"})
-                      for agent in state.config.agents],
+        participants=participants,
         avatar_indices=assign_avatars(state.config.agents, state.id),
         panel_rationale=context.rationale, panel_balance_notes=context.balance_notes,
         rounds=[step.name for step in state.config.round_plan.rounds],

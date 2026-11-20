@@ -45,6 +45,7 @@ class DiscussionContext(StrictModel):
     mode: Literal["demo", "live"]
     rationale: str
     balance_notes: list[str]
+    invitee_name: str | None = None
 
 
 class DiscussionTurn(StrictModel):

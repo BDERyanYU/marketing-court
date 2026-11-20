@@ -256,6 +256,9 @@
   flex: 0 0 auto;
   width: 40px;
   aspect-ratio: 1;
+  background-image: url('/roundtable/portraits.png');
+  background-repeat: no-repeat;
+  background-size: 400% 400%;
 }
 .rt-portrait-empty {
   background: #343d48;
@@ -282,7 +285,7 @@
   left: 50%;
   bottom: -16px;
   min-width: min(100%, 132px);
-  max-width: 118%;
+  max-width: min(118%, var(--seat-span));
   padding: 5px 8px;
   transform: translateX(-50%);
   border: 1px solid #9a7659;
@@ -396,11 +399,13 @@
 }
 .rt-persona-title > div {
   flex: 1;
+  min-width: 0;
 }
 .rt-persona-title strong {
   display: block;
   font-size: 1rem;
   color: #ffcf9c;
+  overflow-wrap: anywhere;
 }
 .rt-persona-title small {
   display: block;
@@ -412,37 +417,6 @@
   border: 0;
   background: transparent;
   color: var(--paper);
-}
-.rt-persona-model {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-top: 10px;
-  padding: 4px 8px;
-  border: 1px solid #e9ba8730;
-  border-radius: 9px;
-  background: radial-gradient(ellipse at 26% 60%, #392f38, #19212a);
-}
-.rt-persona-model .rt-portrait {
-  width: clamp(64px, 11cqi, 102px);
-}
-.rt-persona-angles {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-}
-.rt-persona-angles button {
-  padding: 5px 7px;
-  border: 1px solid #bb967c58;
-  border-radius: 6px;
-  background: #ffffff0a;
-  color: var(--paper);
-  font-size: 0.75rem;
-}
-.rt-persona-angles button[aria-pressed='true'] {
-  border-color: #edbf87;
-  color: #ffd3a1;
-  background: #d9a7671c;
 }
 .rt-persona dl {
   margin-top: 10px;
@@ -639,6 +613,12 @@
   display: block;
   font-size: 0.83rem;
   color: #f3cda6;
+  overflow-wrap: anywhere;
+}
+.rt-turn strong small {
+  margin-inline-start: 6px;
+  color: #dfbcea;
+  font-weight: normal;
 }
 .rt-turn > button > span:last-child > span {
   display: block;
@@ -828,7 +808,6 @@
     height: 25%;
   }
   .rt-nameplate {
-    max-width: var(--seat-span);
     padding-inline: 3px;
   }
   .rt-bubble {

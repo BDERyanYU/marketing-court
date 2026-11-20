@@ -91,7 +91,12 @@ def test_saved_digital_persona_joins_moot_with_its_own_seat(tmp_path, monkeypatc
             "report_id": report["report_id"], "persona_id": report["personas"][0]["persona_id"], "member_count": 2,
         }).raise_for_status().json()
         member = panel["members"][1]
-        name = member["specification"]["persona"]["name"]
+        # Reuse the name of a demo expert to exercise Moot's unique runtime names.
+        name = "Sam"
+        member["specification"]["persona"]["name"] = name
+        with closing(sqlite3.connect(jury_database)) as db, db:
+            db.execute("UPDATE jury_records SET body = ? WHERE kind = 'panel' AND id = ?",
+                       (json.dumps(panel, ensure_ascii=False), panel["panel_id"]))
         choices = client.get(invitees_url).raise_for_status().json()
         assert choices[0]["panel_id"] == panel["panel_id"]
         assert choices[0]["report_name"] == "水杯报告.txt"
@@ -121,6 +126,7 @@ def test_saved_digital_persona_joins_moot_with_its_own_seat(tmp_path, monkeypatc
         assert result["avatar_indices"] == meeting["avatar_indices"]
         turns = [turn for turn in result["turns"] if turn["speaker_id"] == guest["id"]]
         assert {turn["round_index"] for turn in turns} == {0, 1, 2}
+        assert all(turn["speaker_name"] == name for turn in turns)
         assert all(not turn["source_ids"] for turn in turns)
         assert client.get(f"/api/jury/panels/{panel['panel_id']}").raise_for_status().json() == panel
 
@@ -128,6 +134,7 @@ def test_saved_digital_persona_joins_moot_with_its_own_seat(tmp_path, monkeypatc
         (raw_state,) = db.execute("SELECT state FROM sessions WHERE id = ?", (meeting["discussion_id"],)).fetchone()
     saved = json.loads(raw_state)
     agent = next(agent for agent in saved["config"]["agents"] if agent["id"] == guest["id"])
+    assert agent["name"] != name
     frozen_profile = json.loads(agent["prompt_override"].splitlines()[-1])
     assert frozen_profile["member"]["specification"] == member["specification"]
     assert frozen_profile["sampled_values"] == member["sampled_values"]
