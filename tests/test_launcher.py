@@ -59,8 +59,23 @@ def test_local_server_serves_ui_and_api_together(tmp_path, monkeypatch):
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(name)
     with TestClient(server.create_local_app()) as client:
-        for route, content in [("/", "index.html"), ("/review", "review/index.html"), ("/review/", "review/index.html"), ("/jury", "jury/index.html"), ("/jury/", "jury/index.html"), ("/landing-ads/sample.webp", "landing-ads/sample.webp")]:
-            assert client.get(route).text == content
+        pages = {
+            "/": "index.html",
+            "/index.html": "index.html",
+            "/review": "review/index.html",
+            "/review/": "review/index.html",
+            "/review/index.html": "review/index.html",
+            "/jury": "jury/index.html",
+            "/jury/": "jury/index.html",
+            "/jury/index.html": "jury/index.html",
+        }
+        for route, content in pages.items():
+            response = client.get(route)
+            assert response.text == content
+            assert response.headers.get("cache-control") == "no-store"
+        image = client.get("/landing-ads/sample.webp")
+        assert image.text == "landing-ads/sample.webp"
+        assert "cache-control" not in image.headers
         assert client.get("/health").json()["mode"] == "demo"
         assert client.get("/api/jury/demo").json()["mode"] == "demo"
         assert client.get("/__launcher/status").json()["instance"] == "test-instance"
