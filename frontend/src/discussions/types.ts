@@ -3,6 +3,18 @@ import type { Review } from '../lib/types'
 export type Risk = Review['risks'][number]
 export type Source = Review['sources'][number]
 
+export interface InviteeReference {
+  panel_id: string
+  member_id: string
+}
+
+export interface InviteePanel {
+  panel_id: string
+  report_name: string | null
+  base_persona_name: string | null
+  members: { member_id: string; name: string }[]
+}
+
 export interface Persona {
   id: string
   name: string
@@ -37,6 +49,7 @@ export interface Discussion {
   issue: {
     question: string
     sources: Source[]
+    invitee?: InviteeReference | null
   }
 }
 

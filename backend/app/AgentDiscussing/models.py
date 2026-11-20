@@ -1,5 +1,6 @@
 from datetime import datetime
 from typing import Annotated, Literal
+from uuid import UUID
 
 from pydantic import JsonValue, StringConstraints
 
@@ -7,8 +8,26 @@ from ..models.common import StrictModel
 from ..models.review import PolicySource, RiskItem
 
 
+class InviteeReference(StrictModel):
+    panel_id: UUID
+    member_id: UUID
+
+
+class InviteeOption(StrictModel):
+    member_id: UUID
+    name: str
+
+
+class InviteePanel(StrictModel):
+    panel_id: UUID
+    report_name: str | None
+    base_persona_name: str | None
+    members: list[InviteeOption]
+
+
 class DiscussionRequest(StrictModel):
     question: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=1000)]
+    invitee: InviteeReference | None = None
 
 
 class DiscussionIssue(DiscussionRequest):

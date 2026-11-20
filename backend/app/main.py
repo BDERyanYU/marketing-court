@@ -40,12 +40,12 @@ def create_app(*, database_path: Path | None = None, provider: ModelProvider | N
         description="营销素材审核、改写复核与消费者模拟。投放审批由人工负责。",
         lifespan=lifespan,
     )
-    discussion_router, delete_discussions = build_discussion_routes(store, provider, path)
+    jury_path = jury_database_path or Path(os.environ.get("JURY_DB_PATH", str(path.parent / "consumer-jury.sqlite3")))
+    jury_repository = register_jury_routes(app, database_path=jury_path)
+    discussion_router, delete_discussions = build_discussion_routes(store, provider, path, jury_repository)
     app.include_router(build_review_router(store, workflow, storage, delete_discussions=delete_discussions))
     app.include_router(build_workspace_router(store, workflow))
     app.include_router(discussion_router)
-    jury_path = jury_database_path or Path(os.environ.get("JURY_DB_PATH", str(path.parent / "consumer-jury.sqlite3")))
-    register_jury_routes(app, database_path=jury_path)
 
     @app.get("/", include_in_schema=False)
     def docs():

@@ -43,6 +43,7 @@ export default function Stage({
   const stageStyle = {
     '--speaker-x': `${active?.x ?? 50}cqi`,
     '--speaker-y': `${active?.y ?? 64}cqh`,
+    '--seat-span': `${70 / Math.max(1, seats.length - 1)}cqi`,
   } as CSSProperties
 
   return (
@@ -69,6 +70,7 @@ export default function Stage({
             type="button"
             key={seat.id}
             data-seat-id={seat.id}
+            data-invited={seat.id === discussion?.issue.invitee?.member_id || undefined}
             aria-label={`查看 ${seat.name} 人设`}
             aria-expanded={selected?.id === seat.id}
             className={`rt-seat${turn?.speaker_id === seat.id ? ' is-speaking' : ''}`}

@@ -4,7 +4,7 @@ from contextlib import suppress
 from pathlib import Path
 
 from fastapi import HTTPException
-from moot.core import ModelRef, SessionConfig, SessionState, SessionStatus, SpeakerKind
+from moot.core import AIModerator, ModelRef, SessionConfig, SessionState, SessionStatus, SpeakerKind
 from moot.core.round_plan import brainstorm
 from moot.core.rules import RulePreset, SessionRules
 from moot.engine.designer import DesignError, TeamDesigner
@@ -14,6 +14,7 @@ from moot.storage import SessionStore
 
 from ..core.model_api import ModelProvider
 from .avatars import assign_avatars
+from .invitees import SavedInvitee, guest_persona
 from .models import DiscussionContext, DiscussionIssue, DiscussionTurn, DiscussionView
 from .provider import ReviewProvider, citation_ids, visible_citations
 
@@ -34,7 +35,9 @@ class DiscussionService:
             },
         )
 
-    async def start(self, issue: DiscussionIssue, require_review: Callable[[], object]) -> DiscussionView:
+    async def start(
+        self, issue: DiscussionIssue, require_review: Callable[[], object], guest: SavedInvitee | None,
+    ) -> DiscussionView:
         goal = (
             "请为一项环保营销审核的证据争议组成一个圆桌讨论小组。"
             "以不同专业视角审视规则适用、证据缺口及可能的改写或补证。"
@@ -57,9 +60,15 @@ class DiscussionService:
                 issue=issue, mode=self.provider.provider.mode,
                 rationale=proposal.rationale, balance_notes=proposal.balance_notes,
             )
+            moderator = AIModerator()
+            agents = proposal.agents.copy()
+            if guest is not None:
+                occupied_names = {agent.name.casefold() for agent in agents}
+                occupied_names.add(moderator.name.casefold())
+                agents.append(guest_persona(guest, occupied_names))
             config = SessionConfig(
                 topic=issue.question, background=context.model_dump_json(),
-                agents=proposal.agents, default_model=self.model, allow_alliances=False,
+                agents=agents, moderator=moderator, default_model=self.model, allow_alliances=False,
                 round_plan=evidence_rounds(),
                 rules=SessionRules(presets=[RulePreset.STAY_ON_TOPIC, RulePreset.EVIDENCE_REQUIRED]),
             )

@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import Icon from '../components/Icon'
 import { api, post } from '../lib/api'
+import InviteePicker from './InviteePicker'
 import Portrait from './Portrait'
 import Stage from './Stage'
-import type { Discussion, Risk, Source, Turn } from './types'
+import type { Discussion, InviteeReference, Risk, Source, Turn } from './types'
 import { speakerName, speech } from './types'
 import './roundtable.css'
 
@@ -53,6 +54,7 @@ export default function Roundtable({
   const [discussionId, setDiscussionId] = useState(() => sessionStorage.getItem(storageKey))
   const [discussion, setDiscussion] = useState<Discussion | null>(null)
   const [question, setQuestion] = useState('现有规则证据能否支持这项风险判断？还缺哪些材料？')
+  const [invitee, setInvitee] = useState<InviteeReference | null>(null)
   const [starting, setStarting] = useState(false)
   const [error, setError] = useState('')
   const [cursor, setCursor] = useState(0)
@@ -119,7 +121,7 @@ export default function Roundtable({
     try {
       const record = await post<Discussion>(
         `/api/reviews/${encodeURIComponent(reviewId)}/risks/${encodeURIComponent(risk.risk_id)}/discussions`,
-        { question: question.trim() },
+        { question: question.trim(), invitee },
       )
       sessionStorage.setItem(storageKey, record.discussion_id)
       setDiscussion(record)
@@ -138,6 +140,7 @@ export default function Roundtable({
     sessionStorage.removeItem(storageKey)
     setDiscussionId(null)
     setDiscussion(null)
+    setInvitee(null)
     setError('')
     setCursor(0)
     setExpanded({})
@@ -203,6 +206,7 @@ export default function Roundtable({
                   disabled={starting}
                   required
                 />
+                <InviteePicker invitee={invitee} onChange={setInvitee} disabled={starting} />
                 <button type="submit" disabled={starting || !question.trim()}>
                   {starting ? '正在分配角色…' : '启动圆桌讨论'} <Icon name="arrow" size={16} />
                 </button>

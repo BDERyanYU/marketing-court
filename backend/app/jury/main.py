@@ -34,7 +34,7 @@ def register_jury_routes(
     provider: ModelProvider | None = None,
     skill_path: Path | None = None,
     page_path: str = "/jury",
-) -> None:
+) -> JuryRepository:
     provider = provider if provider is not None else provider_from_env()
     configured_skill = os.environ.get("JURY_THEORY_SKILL_FILE")
     if skill_path is None and configured_skill:
@@ -111,6 +111,7 @@ def register_jury_routes(
         return JSONResponse(status_code=error.status, content={"detail": str(error)})
 
     app.include_router(router)
+    return service.repo
 
 
 def create_app(

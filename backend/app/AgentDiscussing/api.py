@@ -10,15 +10,17 @@ from fastapi import APIRouter, HTTPException
 
 from ..core.model_api import ModelProvider
 from ..core.store import Store
+from ..jury.repository import JuryRepository
 from ..models.review import Review
-from .models import DiscussionIssue, DiscussionRequest, DiscussionView
+from .invitees import resolve_invitee
+from .models import DiscussionIssue, DiscussionRequest, DiscussionView, InviteeOption, InviteePanel
 
 if TYPE_CHECKING:
     from .service import DiscussionService
 
 
 def build_discussion_routes(
-    store: Store, provider: ModelProvider, app_database: Path,
+    store: Store, provider: ModelProvider, app_database: Path, jury: JuryRepository,
 ) -> tuple[APIRouter, Callable[[str], bool]]:
     service: DiscussionService | None = None
     database_path = app_database.with_name(f"{app_database.name}.agent-discussions.sqlite3")
@@ -54,11 +56,24 @@ def build_discussion_routes(
         if risk is None:
             raise HTTPException(404, "所选风险不属于该次审核。")
         issue = DiscussionIssue(
-            question=request.question, review_id=review.review_id, project_id=review.project_id,
+            question=request.question, invitee=request.invitee, review_id=review.review_id, project_id=review.project_id,
             asset_version_id=review.asset_version_id, market=review.market, rule_pack_version=review.rule_pack_version,
             risk=risk, sources=[source for source in review.sources if source.source_id in risk.source_ids],
         )
-        return await runtime().start(issue, lambda: store.get("review", review_id, Review))
+        guest = resolve_invitee(jury, request.invitee) if request.invitee else None
+        return await runtime().start(issue, lambda: store.get("review", review_id, Review), guest)
+
+    @router.get("/discussions/invitees", response_model=list[InviteePanel])
+    def invitees():
+        """List the saved digital personas available to this workspace."""
+        return [
+            InviteePanel(
+                panel_id=panel.panel_id, report_name=report_name,
+                base_persona_name=panel.base_persona.name if panel.base_persona else None,
+                members=[InviteeOption(member_id=member.member_id, name=member.name) for member in panel.members],
+            )
+            for panel, report_name in jury.panels_with_report_names() if panel.members
+        ]
 
     @router.get("/discussions/{discussion_id}", response_model=DiscussionView)
     async def discussion(discussion_id: str):

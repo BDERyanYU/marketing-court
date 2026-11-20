@@ -32,6 +32,8 @@ curl -fsSL https://raw.githubusercontent.com/BDERyanYU/marketing-court/main/scri
 
 审核报告的风险卡提供 **圆桌复核**。Moot 使用独立会议库和既有模型配置。手动为已有环境启用圆桌可运行 `uv sync --locked --inexact --extra roundtable`。
 
+在「数字人像测试」生成并保存人像后，可在发起圆桌时从下拉框邀请一位。圆桌保留这位人像的原始设定，分配独立座位和低多边形形象，发言记录随会议保存。悬停可看人设，点击可切换正面和侧面。数字人像提供模拟消费视角，原画像和 A/B 结果留在各自的记录中。
+
 需要 Python 3.12+、uv 和 Node.js 20+。
 
 ```powershell

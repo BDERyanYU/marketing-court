@@ -24,7 +24,7 @@
 .rt-room :is(h1, h2, p, dl, dd, ol) {
   margin: 0;
 }
-.rt-room :is(button, textarea) {
+.rt-room :is(button, select, textarea) {
   font: inherit;
 }
 .rt-room button {
@@ -34,7 +34,7 @@
   cursor: default;
   opacity: 0.48;
 }
-.rt-room :is(button, a, textarea, summary):focus-visible {
+.rt-room :is(button, a, select, textarea, summary):focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 3px;
 }
@@ -121,7 +121,7 @@
 }
 
 .rt-stage {
-  --avatar-size: clamp(65px, min(17.5cqi, 30cqh), 186px);
+  --avatar-size: min(clamp(65px, min(17.5cqi, 30cqh), 186px), var(--seat-span));
   position: relative;
   isolation: isolate;
   container-type: size;
@@ -307,6 +307,9 @@
   margin-top: 1px;
   color: #c7b6ae;
 }
+.rt-seat[data-invited] .rt-nameplate small {
+  color: #dfbcea;
+}
 .rt-seat.is-speaking .rt-nameplate {
   border-color: #f9ca91;
   box-shadow:
@@ -485,15 +488,25 @@
   font-size: 0.87rem;
   margin: 5px 0 7px;
 }
-.rt-setup textarea {
+.rt-setup textarea,
+.rt-invite select {
   width: 100%;
   padding: 10px;
-  resize: vertical;
   border: 1px solid #ffffff37;
   border-radius: 9px;
   background: #0f1823;
   color: var(--paper);
   line-height: 1.6;
+}
+.rt-setup textarea {
+  resize: vertical;
+}
+.rt-invite {
+  margin-top: 12px;
+}
+.rt-invite p {
+  margin: 6px 0 0;
+  font-size: 0.78rem;
 }
 .rt-setup button {
   display: inline-flex;
@@ -771,30 +784,18 @@
 }
 
 @media (max-width: 880px) {
-  .rt-shell {
-    display: flex;
-    flex-direction: column;
-    overflow-y: auto;
-  }
   .rt-main {
     display: block;
-    flex: none;
+    overflow-y: auto;
+    overscroll-behavior: contain;
   }
   .rt-stage {
     height: clamp(380px, 64vh, 590px);
   }
   .rt-rail {
+    overflow-y: visible;
     border-left: 0;
     border-top: 1px solid var(--line);
-  }
-  .rt-header,
-  .rt-controls {
-    flex: 0 0 auto;
-  }
-  .rt-controls {
-    position: sticky;
-    z-index: 6;
-    bottom: 0;
   }
 }
 
@@ -819,12 +820,16 @@
     font-size: 0.71rem;
   }
   .rt-stage {
-    --avatar-size: clamp(54px, 20cqi, 105px);
+    --avatar-size: min(clamp(54px, 20cqi, 105px), var(--seat-span));
     height: 385px;
   }
   .rt-table {
     top: 63%;
     height: 25%;
+  }
+  .rt-nameplate {
+    max-width: var(--seat-span);
+    padding-inline: 3px;
   }
   .rt-bubble {
     width: min(255px, 64%);

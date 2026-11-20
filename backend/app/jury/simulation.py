@@ -44,10 +44,10 @@ def pending_exposures(panel: Panel, comparison: Comparison) -> list[int]:
     return pending
 
 
-def react(
-    provider: ModelProvider, persona: Persona | None, member: PanelSeat | LegacyMember, copy: str,
+def consumer_profile(
+    persona: Persona | None, member: PanelSeat | LegacyMember,
     *, sampling: SamplingRequest | None = None,
-) -> Reaction:
+) -> dict:
     if isinstance(member, PanelSeat):
         # The native plan may contain ranges and candidate values. The generated persona
         # fixes one concrete identity for both exposures.
@@ -59,16 +59,22 @@ def react(
             ]
     else:
         profile = member.model_dump(exclude={"member_id", "theory_ids"})
+    return {
+        "base_persona": None if persona is None else {
+            "name": persona.name,
+            "traits": [trait.model_dump(exclude={"source_quote"}) for trait in persona.traits],
+        },
+        "member": profile,
+    }
+
+
+def react(
+    provider: ModelProvider, persona: Persona | None, member: PanelSeat | LegacyMember, copy: str,
+    *, sampling: SamplingRequest | None = None,
+) -> Reaction:
     return provider.complete(
         step="jury_reaction",
         instruction=REACT,
-        context={
-            "base_persona": None if persona is None else {
-                "name": persona.name,
-                "traits": [trait.model_dump(exclude={"source_quote"}) for trait in persona.traits],
-            },
-            "member": profile,
-            "ad_copy": copy,
-        },
+        context={**consumer_profile(persona, member, sampling=sampling), "ad_copy": copy},
         output=Reaction,
     )
