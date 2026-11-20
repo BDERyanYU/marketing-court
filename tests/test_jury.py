@@ -32,6 +32,7 @@ class RecordingProvider(DemoProvider):
         self.invalid_plan = None
         self.has_explicit_persona = True
         self.fail_native_person = False
+        self.inject_ad_outcome = False
 
     def complete(self, *, step, instruction, context, output):
         self.calls.append((step, context))
@@ -68,6 +69,13 @@ class RecordingProvider(DemoProvider):
         if self.fail_native_person and "# Agent Generator" in user:
             raise ModelError("Test provider failure")
         result = super().chat(messages, **kwargs)
+        if self.inject_ad_outcome and "Given a sampling description" in system:
+            space = json.loads(result["content"])
+            space["dimensions"].append({
+                "name": "对两版营销文案的首次反应倾向",
+                "values": ["偏好 A", "偏好 B"],
+            })
+            result["content"] = json.dumps(space)
         if self.invalid_plan and "This function defines which and how many people" in system:
             plan = json.loads(result["content"])
             if self.invalid_plan == "count":
@@ -105,6 +113,16 @@ def prepare_panel(client):
 
 def advance(client, case_path, index):
     return client.post(case_path + "/advance", json={"expected_index": index})
+
+
+def test_native_factory_keeps_ad_reactions_out_of_its_sampling_dimensions(tmp_path):
+    provider = RecordingProvider()
+    provider.inject_ad_outcome = True
+    with TestClient(create_app(database_path=tmp_path / "jury.sqlite3", provider=provider)) as client:
+        panel = prepare_panel(client)
+    dimensions = panel["tinytroupe_plan"]["sampling_space"]["dimensions"]
+    assert {dimension["name"] for dimension in dimensions} == {"通勤携带优先项", "清洁偏好"}
+    assert all(set(member["sampled_values"]) == {"通勤携带优先项", "清洁偏好"} for member in panel["members"])
 
 
 def test_confirmed_persona_uses_the_configured_skill_and_blind_ab_pairs_resume(tmp_path):

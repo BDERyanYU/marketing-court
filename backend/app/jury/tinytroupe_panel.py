@@ -1,6 +1,7 @@
 """Use the vendored TinyTroupe factory through the shared model connection."""
 
 import json
+import re
 from contextlib import contextmanager
 from threading import Lock
 from uuid import uuid4
@@ -12,6 +13,18 @@ from .models import PanelSeat, TinyTroupePlan
 SOURCE_COMMIT = "7ce8be378a37ee73f9745d6781452712318afa04"
 _CLIENT_NAME = "marketing-court"
 _FACTORY_LOCK = Lock()
+_FACTORY_INSTRUCTION = (
+    "在本应用中，画像工厂只刻画看到广告前已有的消费者特征。"
+    "保留与产品决策有关的抽样维度，从报告中提取依据，新增差异作为假设。"
+    "待测文案的反应、版本偏好、评分、投票和购买结论不进入抽样维度、组合或人设。"
+    "通用模板中的政治信念和族裔等细节须有报告依据且与产品相关，否则省略这些抽样维度。"
+    "生成人设时沿用原版字段类型。"
+)
+_EXPOSURE_OUTCOME_AXIS = re.compile(
+    r"(?:两版|各版|待测文案|A\s*[/／]\s*B|[AB]\s*版).*?(?:反应|偏好|倾向|投票|评分|选择)"
+    r"|\b(?:a\s*/\s*b|(?:copy|ad)\s+variants?|variants?)[\s_-]+(?:reaction|preference|vote|rating|score)\b",
+    re.IGNORECASE,
+)
 
 
 class _SharedClient:
@@ -26,6 +39,11 @@ class _SharedClient:
     def send_message(self, messages, *, response_format=None, temperature=None, **_kwargs):
         if self.error is not None:
             raise self.error
+        messages = [
+            {**message, "content": message["content"] + "\n\n" + _FACTORY_INSTRUCTION}
+            if message.get("role") == "system" else message
+            for message in messages
+        ]
         try:
             reply = self.chat(
                 messages,
@@ -36,16 +54,16 @@ class _SharedClient:
             if response_format is not None:
                 try:
                     data = json.loads(reply["content"])
+                    if self.expected_plan_size is not None and isinstance(data, dict):
+                        if "sample_plan" in data:
+                            self._check_quotas(data["sample_plan"])
+                            self.expected_plan_size = None
+                        elif "dimensions" in data:
+                            self._check_dimensions(data["dimensions"])
                     # Pass literal Unicode to the original parser, which mishandles \u escapes.
                     reply = {**reply, "content": json.dumps(data, ensure_ascii=False, allow_nan=False)}
                 except ValueError:
                     raise ModelError("TinyTroupe 模型未返回有效 JSON。") from None
-                if self.expected_plan_size is not None and isinstance(data, dict):
-                    if "sample_plan" in data:
-                        self._check_quotas(data["sample_plan"])
-                        self.expected_plan_size = None
-                    elif "dimensions" in data:
-                        self._check_dimensions(data["dimensions"])
             return reply
         except ModelError as error:
             self.error = error
@@ -57,7 +75,10 @@ class _SharedClient:
         names = [item.get("name") if isinstance(item, dict) else None for item in dimensions]
         if any(not isinstance(name, str) or not name.strip() for name in names) or len(set(names)) != len(names):
             raise ModelError("TinyTroupe 返回了缺少名称或重名的抽样维度。")
-        self.dimension_names = set(names)
+        dimensions[:] = [dimension for dimension in dimensions if not _EXPOSURE_OUTCOME_AXIS.search(dimension["name"])]
+        if not dimensions:
+            raise ModelError("TinyTroupe 未返回接触文案前的画像维度。请重试。")
+        self.dimension_names = {dimension["name"] for dimension in dimensions}
 
     def _check_quotas(self, plan):
         # Validate before the original factory expands the quotas and names each seat.
