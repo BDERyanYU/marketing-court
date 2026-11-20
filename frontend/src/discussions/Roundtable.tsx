@@ -3,7 +3,7 @@ import Icon from '../components/Icon'
 import { api, post } from '../lib/api'
 import InviteePicker from './InviteePicker'
 import Stage, { Portrait } from './Stage'
-import type { Discussion, InviteeReference, Risk, Source, Turn } from './types'
+import type { Discussion, DiscussionTarget, InviteeReference, Source, Turn } from './types'
 import { speakerName, speech } from './types'
 import './roundtable.css'
 
@@ -12,6 +12,8 @@ const ROUND_LABELS: Record<string, string> = {
   'Free discussion': '交叉讨论',
   'Closing statements': '收尾与建议',
 }
+const MIN_PARTICIPANTS = 2
+const MAX_PARTICIPANTS = 8
 
 function roundOf(turn: Turn, index: number, roundCount: number) {
   return turn.round_index ?? (index === 0 ? 0 : Math.max(0, roundCount - 1))
@@ -40,19 +42,25 @@ function References({ ids, sources }: { ids: string[]; sources: Source[] }) {
 }
 
 export default function Roundtable({
-  reviewId,
-  risk,
+  target,
   close,
 }: {
-  reviewId: string
-  risk: Risk
+  target: DiscussionTarget
   close: () => void
 }) {
   const dialog = useRef<HTMLDialogElement>(null)
-  const storageKey = `marketing-roundtable:${reviewId}:${risk.risk_id}`
+  const review = target === 'standalone' ? null : target
+  const storageKey = review
+    ? `marketing-roundtable:${review.reviewId}:${review.risk.risk_id}`
+    : 'marketing-roundtable:standalone'
   const [discussionId, setDiscussionId] = useState(() => sessionStorage.getItem(storageKey))
   const [discussion, setDiscussion] = useState<Discussion | null>(null)
-  const [question, setQuestion] = useState('现有规则证据能否支持这项风险判断？还缺哪些材料？')
+  const [question, setQuestion] = useState(() =>
+    review
+      ? `现有规则和证据是否足以支持对「${review.risk.claim_quote.slice(0, 180)}」的风险判断？还有哪些材料需要核实？`
+      : '',
+  )
+  const [participantCount, setParticipantCount] = useState('')
   const [invitee, setInvitee] = useState<InviteeReference | null>(null)
   const [starting, setStarting] = useState(false)
   const [error, setError] = useState('')
@@ -66,6 +74,11 @@ export default function Roundtable({
   const hasNext = cursor < turns.length - 1
   const finished = discussion?.status === 'finished'
   const canReplay = finished && !hasNext && turns.length > 0
+  const count = Number(participantCount)
+  const canStart = Boolean(question.trim()) && (
+    review !== null || (Number.isInteger(count) && count >= MIN_PARTICIPANTS && count <= MAX_PARTICIPANTS)
+  )
+  const subtitle = review?.risk.claim_quote ?? discussion?.issue.question
 
   useEffect(() => {
     const node = dialog.current
@@ -114,13 +127,17 @@ export default function Roundtable({
 
   async function start(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (!question.trim() || starting) return
+    if (!canStart || starting) return
     setStarting(true)
     setError('')
+    const input = { question: question.trim(), invitee }
+    const endpoint = review
+      ? `/api/reviews/${encodeURIComponent(review.reviewId)}/risks/${encodeURIComponent(review.risk.risk_id)}/discussions`
+      : '/api/discussions'
     try {
       const record = await post<Discussion>(
-        `/api/reviews/${encodeURIComponent(reviewId)}/risks/${encodeURIComponent(risk.risk_id)}/discussions`,
-        { question: question.trim(), invitee },
+        endpoint,
+        review ? input : { ...input, participant_count: count },
       )
       sessionStorage.setItem(storageKey, record.discussion_id)
       setDiscussion(record)
@@ -140,6 +157,10 @@ export default function Roundtable({
     setDiscussionId(null)
     setDiscussion(null)
     setInvitee(null)
+    if (!review) {
+      setQuestion('')
+      setParticipantCount('')
+    }
     setError('')
     setCursor(0)
     setExpanded({})
@@ -178,11 +199,11 @@ export default function Roundtable({
       <div className="rt-shell">
         <header className="rt-header">
           <button type="button" className="rt-back" onClick={close} disabled={starting}>
-            <Icon name="back" size={17} /> 返回审核
+            <Icon name="back" size={17} /> {review ? '返回审核' : '返回工作区'}
           </button>
           <div className="rt-heading">
-            <h1 id="rt-title">圆桌复核</h1>
-            <p title={risk.claim_quote}>{risk.claim_quote}</p>
+            <h1 id="rt-title">{review ? '圆桌复核' : '圆桌讨论'}</h1>
+            {subtitle && <p title={subtitle}>{subtitle}</p>}
           </div>
           <span className="rt-state" data-meeting-status={discussion?.status} role="status">
             <i /> {status}
@@ -193,20 +214,42 @@ export default function Roundtable({
           <Stage discussion={discussion} turn={turn}>
             {!discussionId && (
               <form className="rt-setup" onSubmit={(event) => void start(event)}>
-                <h2>围绕这项证据发起讨论</h2>
-                <p>{risk.reason}</p>
-                <label htmlFor="rt-question">你想核对的问题</label>
+                <h2>{review ? '围绕这项风险发起讨论' : '设置圆桌讨论'}</h2>
+                {review && <p>{review.risk.reason}</p>}
+                <label htmlFor="rt-question">{review ? '你想核对的问题' : '讨论议题'}</label>
                 <textarea
                   id="rt-question"
                   value={question}
                   maxLength={1000}
                   rows={3}
+                  placeholder={review ? undefined : '例如：怎样比较这两种水杯广告策略？'}
                   onChange={(event) => setQuestion(event.target.value)}
                   disabled={starting}
                   required
                 />
-                <InviteePicker invitee={invitee} onChange={setInvitee} disabled={starting} />
-                <button type="submit" disabled={starting || !question.trim()}>
+                <div className={review ? undefined : 'rt-setup-options'}>
+                  {!review && (
+                    <div>
+                      <label htmlFor="rt-count">讨论者人数</label>
+                      <input
+                        id="rt-count"
+                        type="number"
+                        min={MIN_PARTICIPANTS}
+                        max={MAX_PARTICIPANTS}
+                        step={1}
+                        placeholder={`${MIN_PARTICIPANTS}–${MAX_PARTICIPANTS}`}
+                        aria-describedby="rt-count-help"
+                        value={participantCount}
+                        onChange={(event) => setParticipantCount(event.target.value)}
+                        disabled={starting}
+                        required
+                      />
+                    </div>
+                  )}
+                  <InviteePicker invitee={invitee} onChange={setInvitee} disabled={starting} />
+                </div>
+                {!review && <p id="rt-count-help">受邀人像占一个名额，主持人另计。</p>}
+                <button type="submit" disabled={starting || !canStart}>
                   {starting ? '正在分配角色…' : '启动圆桌讨论'} <Icon name="arrow" size={16} />
                 </button>
                 {error && (

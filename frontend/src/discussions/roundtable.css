@@ -24,7 +24,7 @@
 .rt-room :is(h1, h2, p, dl, dd, ol) {
   margin: 0;
 }
-.rt-room :is(button, select, textarea) {
+.rt-room :is(button, input, select, textarea) {
   font: inherit;
 }
 .rt-room button {
@@ -34,7 +34,7 @@
   cursor: default;
   opacity: 0.48;
 }
-.rt-room :is(button, a, select, textarea, summary):focus-visible {
+.rt-room :is(button, a, input, select, textarea, summary):focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 3px;
 }
@@ -451,6 +451,7 @@
   margin: 5px 0 7px;
 }
 .rt-setup textarea,
+.rt-setup input,
 .rt-invite select {
   width: 100%;
   padding: 10px;
@@ -465,6 +466,20 @@
 }
 .rt-invite {
   margin-top: 12px;
+}
+.rt-setup-options {
+  display: grid;
+  grid-template-columns: 6.5rem minmax(0, 1fr);
+  align-items: start;
+  gap: 12px;
+  margin-top: 9px;
+}
+.rt-setup-options .rt-invite {
+  margin-top: 0;
+}
+.rt-setup #rt-count-help {
+  margin: 6px 0 0;
+  font-size: 0.78rem;
 }
 .rt-invite p {
   margin: 6px 0 0;

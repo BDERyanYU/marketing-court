@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Annotated, Literal
 from uuid import UUID
 
-from pydantic import JsonValue, StringConstraints
+from pydantic import Field, JsonValue, StringConstraints
 
 from ..models.common import StrictModel
 from ..models.review import PolicySource, RiskItem
@@ -40,8 +40,19 @@ class DiscussionIssue(DiscussionRequest):
     sources: list[PolicySource]
 
 
+class StandaloneRequest(DiscussionRequest):
+    participant_count: int = Field(ge=2, le=8, strict=True)
+
+
+class StandaloneIssue(StandaloneRequest):
+    sources: list[PolicySource] = Field(default_factory=list, max_length=0)
+
+
+DiscussionSubject = DiscussionIssue | StandaloneIssue
+
+
 class DiscussionContext(StrictModel):
-    issue: DiscussionIssue
+    issue: DiscussionSubject
     mode: Literal["demo", "live"]
     rationale: str
     balance_notes: list[str]
@@ -60,7 +71,7 @@ class DiscussionTurn(StrictModel):
 class DiscussionView(StrictModel):
     discussion_id: str
     engine: Literal["moot"] = "moot"
-    issue: DiscussionIssue
+    issue: DiscussionSubject
     mode: Literal["demo", "live"]
     model: str
     status: Literal["setup", "running", "paused", "finished"]

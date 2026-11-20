@@ -2,6 +2,7 @@ import type { Review } from '../lib/types'
 
 export type Risk = Review['risks'][number]
 export type Source = Review['sources'][number]
+export type DiscussionTarget = 'standalone' | { reviewId: string; risk: Risk }
 
 export interface InviteeReference {
   panel_id: string

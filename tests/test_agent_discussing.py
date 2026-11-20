@@ -74,6 +74,35 @@ def test_discussion_cannot_attach_to_a_risk_outside_the_review(tmp_path):
     assert not database.with_name("marketing.sqlite3.agent-discussions.sqlite3").exists()
 
 
+def test_standalone_discussion_uses_its_own_topic_and_persists_without_a_review(tmp_path):
+    pytest.importorskip("moot")
+    database = tmp_path / "marketing.sqlite3"
+    topic = "广告审查报告里的 [source:example] 应该怎样解释？"
+    with TestClient(create_app(database_path=database, provider=DemoProvider())) as client:
+        assert client.post("/api/discussions", json={"question": topic}).status_code == 422
+        assert client.post("/api/discussions", json={"question": " ", "participant_count": 4}).status_code == 422
+        assert client.post("/api/discussions", json={"question": topic, "participant_count": 9}).status_code == 422
+        response = client.post("/api/discussions", json={"question": topic, "participant_count": 8})
+        assert response.status_code == 202
+        url = "/api/discussions/" + response.json()["discussion_id"]
+        result = wait_for_discussion(client, url)
+        assert result["end_reason"] == "completed"
+        assert result["issue"]["question"] == topic
+        assert result["issue"]["participant_count"] == 8
+        assert result["issue"]["sources"] == []
+        assert "review_id" not in result["issue"]
+        assert len(result["participants"]) == 8
+        assert len(set(result["avatar_indices"].values())) == 9
+        assert len({turn["speaker_id"] for turn in result["turns"] if turn["speaker_kind"] == "agent"}) == 8
+        assert not result["report_source_ids"]
+        assert all(not turn["source_ids"] for turn in result["turns"])
+        review = client.post("/api/demo").raise_for_status().json()
+        client.delete(f"/api/projects/{review['project_id']}").raise_for_status()
+        assert client.get(url).raise_for_status().json() == result
+    with TestClient(create_app(database_path=database, provider=DemoProvider())) as client:
+        assert client.get(url).raise_for_status().json() == result
+
+
 def test_saved_digital_persona_joins_moot_with_its_own_seat(tmp_path, monkeypatch):
     pytest.importorskip("moot")
     monkeypatch.setenv("JURY_MODE", "demo")
@@ -129,6 +158,13 @@ def test_saved_digital_persona_joins_moot_with_its_own_seat(tmp_path, monkeypatc
         assert all(turn["speaker_name"] == name for turn in turns)
         assert all(not turn["source_ids"] for turn in turns)
         assert client.get(f"/api/jury/panels/{panel['panel_id']}").raise_for_status().json() == panel
+        standalone = client.post("/api/discussions", json={
+            "question": "两种水杯文案各有什么特点？", "participant_count": 2, "invitee": invitee,
+        }).raise_for_status().json()
+        free_result = wait_for_discussion(client, "/api/discussions/" + standalone["discussion_id"])
+        assert free_result["end_reason"] == "completed"
+        assert len(free_result["participants"]) == 2
+        assert guest["id"] in {agent["id"] for agent in free_result["participants"]}
 
     with closing(sqlite3.connect(discussion_database)) as db:
         (raw_state,) = db.execute("SELECT state FROM sessions WHERE id = ?", (meeting["discussion_id"],)).fetchone()

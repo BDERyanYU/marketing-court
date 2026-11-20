@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { api, post } from './lib/api'
 import { taskError, taskStage } from './lib/task-status'
 import type { Asset, DemoCase, Health, Page, Project, Review, Rewrite, Task } from './lib/types'
@@ -7,9 +7,11 @@ import ReviewPage from './pages/Review'
 import ProjectPage from './pages/Project'
 import Jury from './pages/Jury'
 import Icon from './components/Icon'
+import type { DiscussionTarget } from './discussions/types'
 import './persona.css'
 
 const STORAGE = 'marketing-court-session-v1'
+const Roundtable = lazy(() => import('./discussions/Roundtable'))
 
 function savedSession(): { page?: Page; projectId?: string; reviewId?: string; taskId?: string } {
   try {
@@ -62,6 +64,7 @@ export default function App() {
   const [historyError, setHistoryError] = useState('')
   const [historyReload, setHistoryReload] = useState(0)
   const [review, setReview] = useState<Review | null>(null)
+  const [roundtable, setRoundtable] = useState<DiscussionTarget | null>(null)
   const [asset, setAsset] = useState<Asset | null>(null)
   const [selectedRisk, setSelectedRisk] = useState('')
   const [rewrites, setRewrites] = useState<Rewrite[]>([])
@@ -329,6 +332,9 @@ export default function App() {
           >
             <Icon name="spark" /> 数字人像测试 <span className="nav-indicator" />
           </button>
+          <button type="button" onClick={() => setRoundtable('standalone')}>
+            <Icon name="scales" /> 圆桌讨论 <span className="nav-indicator" />
+          </button>
           <div className="sidebar-project-heading">
             我的项目 <span>{projects.length}</span>
           </div>
@@ -527,6 +533,7 @@ export default function App() {
               rechecks={rechecks}
               busy={locked}
               onSelect={setSelectedRisk}
+              onDiscuss={(risk) => review && setRoundtable({ reviewId: review.review_id, risk })}
               onSetup={() => navigate(selectedProject ? 'project' : 'setup')}
               onVersion={(id) => void chooseReview(id)}
               onRetryStart={() =>
@@ -555,6 +562,11 @@ export default function App() {
           <span className="footer-wordmark">Marketing Court</span>
         </footer>
       </div>
+      {roundtable && (
+        <Suspense fallback={null}>
+          <Roundtable target={roundtable} close={() => setRoundtable(null)} />
+        </Suspense>
+      )}
       {showProgress && !progressDismissed && (
         <div className="review-progress-overlay">
           <section

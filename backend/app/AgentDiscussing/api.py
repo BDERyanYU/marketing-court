@@ -13,7 +13,10 @@ from ..core.store import Store
 from ..jury.repository import JuryRepository
 from ..models.review import Review
 from .invitees import resolve_invitee
-from .models import DiscussionIssue, DiscussionRequest, DiscussionView, InviteeOption, InviteePanel
+from .models import (
+    DiscussionIssue, DiscussionRequest, DiscussionView, InviteeOption, InviteePanel,
+    StandaloneIssue, StandaloneRequest,
+)
 
 if TYPE_CHECKING:
     from .service import DiscussionService
@@ -61,7 +64,14 @@ def build_discussion_routes(
             risk=risk, sources=[source for source in review.sources if source.source_id in risk.source_ids],
         )
         guest = resolve_invitee(jury, request.invitee) if request.invitee else None
-        return await runtime().start(issue, lambda: store.get("review", review_id, Review), guest)
+        return await runtime().start(issue, guest=guest, require_review=lambda: store.get("review", review_id, Review))
+
+    @router.post("/discussions", response_model=DiscussionView, status_code=202)
+    async def start_standalone(request: StandaloneRequest):
+        """Start a roundtable on a user-supplied topic."""
+        issue = StandaloneIssue(**request.model_dump())
+        guest = resolve_invitee(jury, request.invitee) if request.invitee else None
+        return await runtime().start(issue, guest=guest)
 
     @router.get("/discussions/invitees", response_model=list[InviteePanel])
     def invitees():
@@ -79,7 +89,8 @@ def build_discussion_routes(
     async def discussion(discussion_id: str):
         """Read saved evidence, participants, turns and the moderator’s report."""
         meeting = runtime().get(discussion_id)
-        store.get("review", meeting.issue.review_id, Review)
+        if isinstance(meeting.issue, DiscussionIssue):
+            store.get("review", meeting.issue.review_id, Review)
         return meeting
 
     async def purge_project(project_id: str) -> None:
