@@ -55,6 +55,27 @@ async function main() {
     fs.mkdirSync(output, { recursive: true })
     await page.waitForFunction(() => Number(getComputedStyle(document.querySelector('.rt-light')).opacity) >= 0.99)
     await page.screenshot({ path: path.join(output, 'roundtable-desktop.png') })
+    assert.equal(await dialog.locator('[data-seat-id] canvas').count(), 4, 'every seat must render geometry')
+    const seatAngles = await dialog.locator('[data-seat-id] canvas').evaluateAll((models) =>
+      models.map((model) => Number(model.dataset.yaw)))
+    assert.ok(seatAngles.some((angle) => Math.abs(angle) >= 30), 'outer seats should show a side view')
+    assert.ok(seatAngles.some((angle) => Math.abs(angle) <= 12), 'inner seats should show a front view')
+
+    await other.click()
+    const model = dialog.locator('.rt-persona-model canvas')
+    const format = await model.evaluate((canvas) => {
+      const pixels = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data
+      return { image: canvas.toDataURL(), painted: pixels.some((value, index) => index % 4 === 3 && value > 0) }
+    })
+    assert.equal(format.painted, true)
+    await model.screenshot({ path: path.join(output, 'portrait-front.png') })
+    await dialog.getByRole('button', { name: '侧面', exact: true }).click()
+    assert.notEqual(await model.evaluate((canvas) => canvas.toDataURL()), format.image)
+    assert.equal(await model.getAttribute('data-yaw'), '75')
+    assert.deepEqual(await other.boundingBox(), beforeHover)
+    await model.screenshot({ path: path.join(output, 'portrait-side.png') })
+    await dialog.getByRole('button', { name: '关闭人设' }).click()
+
     await page.mouse.move(10, 10)
     await dialog.getByRole('button', { name: '下一条发言' }).click()
     assert.equal(await bubble.count(), 1)

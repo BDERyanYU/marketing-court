@@ -256,9 +256,6 @@
   flex: 0 0 auto;
   width: 40px;
   aspect-ratio: 1;
-  background-image: url('/roundtable/portraits.png');
-  background-repeat: no-repeat;
-  background-size: 400% 400%;
 }
 .rt-portrait-empty {
   background: #343d48;
@@ -412,6 +409,37 @@
   border: 0;
   background: transparent;
   color: var(--paper);
+}
+.rt-persona-model {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 10px;
+  padding: 4px 8px;
+  border: 1px solid #e9ba8730;
+  border-radius: 9px;
+  background: radial-gradient(ellipse at 26% 60%, #392f38, #19212a);
+}
+.rt-persona-model .rt-portrait {
+  width: clamp(64px, 11cqi, 102px);
+}
+.rt-persona-angles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.rt-persona-angles button {
+  padding: 5px 7px;
+  border: 1px solid #bb967c58;
+  border-radius: 6px;
+  background: #ffffff0a;
+  color: var(--paper);
+  font-size: 0.75rem;
+}
+.rt-persona-angles button[aria-pressed='true'] {
+  border-color: #edbf87;
+  color: #ffd3a1;
+  background: #d9a7671c;
 }
 .rt-persona dl {
   margin-top: 10px;
