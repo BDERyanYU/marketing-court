@@ -63,9 +63,7 @@ export default function Stage({
           key={turn.speaker_id}
           data-spotlight-for={turn.speaker_id}
           aria-hidden="true"
-        >
-          <i />
-        </div>
+        />
       )}
       <div className="rt-table" role="img" aria-label="木质圆桌">
         <i />
