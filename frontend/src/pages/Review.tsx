@@ -1,8 +1,11 @@
+import { lazy, Suspense, useState } from 'react'
 import AssetCanvas from '../components/AssetCanvas'
 import Icon from '../components/Icon'
 import { resourceUrl } from '../lib/api'
 import { marketName, categoryName } from '../lib/project-options'
 import type { Asset, Review as ReviewData, Rewrite } from '../lib/types'
+
+const Roundtable = lazy(() => import('../discussions/Roundtable'))
 
 interface Props {
   review: ReviewData | null
@@ -30,6 +33,8 @@ export default function Review({
   onRewrite,
   onVersion,
 }: Props) {
+  const [discussionRiskId, setDiscussionRiskId] = useState<string | null>(null)
+  const discussionRisk = review?.risks.find((risk) => risk.risk_id === discussionRiskId)
   if (!asset)
     return (
       <div className="empty-state">
@@ -219,6 +224,13 @@ export default function Review({
                   </p>
                 ) : null}
                 <p>{risk.reason}</p>
+                <button
+                  type="button"
+                  className="secondary"
+                  onClick={() => setDiscussionRiskId(risk.risk_id)}
+                >
+                  <Icon name="scales" size={16} /> 圆桌复核
+                </button>
                 <div className="evidence-gap">
                   <strong>待补材料</strong>
                   {risk.evidence_gaps.map((g) => (
@@ -360,6 +372,16 @@ export default function Review({
             规则版本 {review.rule_pack_version} · 模型 {review.model}
           </small>
         </section>
+      )}
+      {review && discussionRisk && (
+        <Suspense fallback={null}>
+          <Roundtable
+            key={`${review.review_id}:${discussionRisk.risk_id}`}
+            reviewId={review.review_id}
+            risk={discussionRisk}
+            close={() => setDiscussionRiskId(null)}
+          />
+        </Suspense>
       )}
     </>
   )

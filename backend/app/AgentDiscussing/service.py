@@ -13,6 +13,7 @@ from moot.server.sessions import SessionManager, SessionNotFound
 from moot.storage import SessionStore
 
 from ..core.model_api import ModelProvider
+from .avatars import assign_avatars
 from .models import DiscussionContext, DiscussionIssue, DiscussionTurn, DiscussionView
 from .provider import ReviewProvider, citation_ids, visible_citations
 
@@ -121,6 +122,7 @@ def view(state: SessionState) -> DiscussionView:
         status=state.status.value, end_reason=reason, created_at=state.created_at,
         participants=[agent.model_dump(mode="json", exclude={"model", "knowledge", "tools", "prompt_override"})
                       for agent in state.config.agents],
+        avatar_indices=assign_avatars(state.config.agents, state.id),
         panel_rationale=context.rationale, panel_balance_notes=context.balance_notes,
         rounds=[step.name for step in state.config.round_plan.rounds],
         turns=turns, report=report, report_source_ids=citation_ids(report or ""),

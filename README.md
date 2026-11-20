@@ -30,10 +30,12 @@ curl -fsSL https://raw.githubusercontent.com/BDERyanYU/marketing-court/main/scri
 
 ### 手动开发启动
 
+审核报告的风险卡提供 **圆桌复核**。Moot 使用独立会议库和既有模型配置。手动为已有环境启用圆桌可运行 `uv sync --locked --inexact --extra roundtable`。
+
 需要 Python 3.12+、uv 和 Node.js 20+。
 
 ```powershell
-uv sync --locked --extra ocr
+uv sync --locked --extra ocr --extra roundtable
 Copy-Item .env.example .env
 .venv/Scripts/python.exe -m uvicorn backend.app.main:create_app --factory --env-file .env --host 127.0.0.1 --port 8000 --workers 1
 ```

@@ -28,7 +28,7 @@ ocr-portable = ["rapidocr==3.10.0", "onnxruntime==1.23.2"]
 package = false
 
 [tool.uv.sources]
-moot = { git = "https://github.com/sinaKGT/Moot", rev = "51af49ecbaae8842e5cb21ce7f93418bfac64c4c" }
+moot = { url = "https://github.com/sinaKGT/Moot/archive/51af49ecbaae8842e5cb21ce7f93418bfac64c4c.tar.gz" }
 tinytroupe = { path = "vendor/tinytroupe", editable = true }
 
 [tool.pytest.ini_options]

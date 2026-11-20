@@ -260,14 +260,24 @@ def main():
         if sys.platform == "darwin" and portable_ocr and int(platform.mac_ver()[0].split(".")[0]) < 13:
             raise RuntimeError("这台 Intel Mac 需要升级到 macOS 13 或以上，才能安装图片文字识别组件。")
         extra = "ocr-portable" if portable_ocr else "ocr"
-        signature = fingerprint([ROOT / "pyproject.toml", ROOT / "uv.lock", ROOT / "vendor/tinytroupe/pyproject.toml"]) + extra
+        base_signature = fingerprint([
+            ROOT / "pyproject.toml", ROOT / "uv.lock", ROOT / "vendor/tinytroupe/pyproject.toml",
+        ]) + extra
+        signature = base_signature + "+roundtable"
         marker = TOOLS / "backend-ready.txt"
         python = ROOT / ".venv" / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
         if not python.exists() or not marker.exists() or marker.read_text() != signature:
             say("正在准备审核与数字人像组件……")
             python_request = "cpython-3.12-windows-x86_64-none" if os.name == "nt" else "3.12"
-            run([args.uv, "sync", "--locked", "--python", python_request, "--no-dev", "--extra", extra], env=env)
-            marker.write_text(signature)
+            install = [args.uv, "sync", "--locked", "--python", python_request, "--no-dev", "--extra", extra]
+            try:
+                run([*install, "--extra", "roundtable"], env=env)
+            except RuntimeError:
+                say("圆桌组件准备失败，继续安装审核与数字人像组件。")
+                run(install, env=env)
+                marker.write_text(base_signature)
+            else:
+                marker.write_text(signature)
         command = [python, Path(__file__), "--uv", args.uv, "--serve"]
         if args.no_browser:
             command.append("--no-browser")

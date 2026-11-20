@@ -46,6 +46,7 @@ class DiscussionView(StrictModel):
     status: Literal["setup", "running", "paused", "finished"]
     end_reason: Literal["completed", "stopped", "error"] | None
     participants: list[dict[str, JsonValue]]
+    avatar_indices: dict[str, int]
     panel_rationale: str
     panel_balance_notes: list[str]
     rounds: list[str]

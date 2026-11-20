@@ -33,6 +33,11 @@ def test_moot_roundtable_uses_the_selected_risk_and_keeps_a_saved_transcript(tmp
         assert result["issue"]["rule_pack_version"] == review["rule_pack_version"]
         assert {s["source_id"] for s in result["issue"]["sources"]} == set(risk["source_ids"])
         assert len(result["participants"]) == 3
+        seat_ids = {"moderator", *(agent["id"] for agent in result["participants"])}
+        avatars = result["avatar_indices"]
+        assert set(avatars) == seat_ids
+        assert len(set(avatars.values())) == len(seat_ids)
+        assert all(0 <= index < 16 for index in avatars.values())
         agent_turns = [turn for turn in result["turns"] if turn["speaker_kind"] == "agent"]
         assert len({turn["speaker_id"] for turn in agent_turns}) == 3
         assert len({turn["round_index"] for turn in agent_turns}) >= 2

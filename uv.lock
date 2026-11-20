@@ -2156,7 +2156,7 @@ dev = [
 requires-dist = [
     { name = "fastapi", specifier = ">=0.115,<1" },
     { name = "httpx", specifier = ">=0.28,<1" },
-    { name = "moot", marker = "extra == 'roundtable'", git = "https://github.com/sinaKGT/Moot?rev=51af49ecbaae8842e5cb21ce7f93418bfac64c4c" },
+    { name = "moot", marker = "extra == 'roundtable'", url = "https://github.com/sinaKGT/Moot/archive/51af49ecbaae8842e5cb21ce7f93418bfac64c4c.tar.gz" },
     { name = "onnxruntime", marker = "extra == 'ocr-portable'", specifier = "==1.23.2" },
     { name = "paddleocr", marker = "extra == 'ocr'", specifier = ">=3,<4" },
     { name = "paddlepaddle", marker = "extra == 'ocr'", specifier = ">=3,<4" },
@@ -2399,7 +2399,7 @@ wheels = [
 [[package]]
 name = "moot"
 version = "0.1.0"
-source = { git = "https://github.com/sinaKGT/Moot?rev=51af49ecbaae8842e5cb21ce7f93418bfac64c4c#51af49ecbaae8842e5cb21ce7f93418bfac64c4c" }
+source = { url = "https://github.com/sinaKGT/Moot/archive/51af49ecbaae8842e5cb21ce7f93418bfac64c4c.tar.gz" }
 dependencies = [
     { name = "fastapi" },
     { name = "httpx" },
@@ -2409,6 +2409,19 @@ dependencies = [
     { name = "pypdf" },
     { name = "python-docx" },
     { name = "uvicorn" },
+]
+sdist = { hash = "sha256:2fd90fd7e651d1b7cffea0dae36cf8b3d0bebd11078a876be8ed7b2437753b3f" }
+
+[package.metadata]
+requires-dist = [
+    { name = "fastapi", specifier = ">=0.115" },
+    { name = "httpx", specifier = ">=0.27" },
+    { name = "mcp", specifier = ">=2.3" },
+    { name = "numpy", specifier = ">=2" },
+    { name = "pydantic", specifier = ">=2.7" },
+    { name = "pypdf", specifier = ">=5" },
+    { name = "python-docx", specifier = ">=1.1" },
+    { name = "uvicorn", specifier = ">=0.30" },
 ]
 
 [[package]]
